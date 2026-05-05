@@ -71,9 +71,8 @@ class CommandCliTests(unittest.TestCase):
     def test_doctor_reports_missing_and_present_dependencies(self):
         with mock.patch("whisprflowctl.shutil.which", return_value="/usr/bin/fake"):
             with mock.patch("whisprflowctl.Path.exists", return_value=True):
-                with mock.patch("whisprflowctl.Path.is_file", return_value=True):
-                    with mock.patch("whisprflowctl.Path.is_dir", return_value=True):
-                        code = whisprflowctl.main(["doctor"])
+                with mock.patch("whisprflowctl.load_config", return_value={"button_device": "button", "mic_device": "mic"}):
+                    code = whisprflowctl.main(["doctor"])
 
         self.assertEqual(code, 0)
 

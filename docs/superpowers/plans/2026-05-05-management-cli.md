@@ -100,7 +100,7 @@ timeout 20 xvfb-run -a /home/joe/whisprflow-ubuntu/.venv/bin/python -m unittest 
 ```bash
 bash -n run.sh autostart.sh install.sh scripts/list-audio-devices.sh
 /home/joe/whisprflow-ubuntu/.venv/bin/python -c "import ast; [ast.parse(open(p).read()) for p in ('whisprflow.py','hud.py','whisprflowctl.py')]"
-git grep -nE 'sk-[A-Za-z0-9_-]{20,}|OPENAI_API_KEY=.*sk-|ghp_[A-Za-z0-9_]{20,}|github_pat_[A-Za-z0-9_]{20,}' -- . ':!.github/workflows/ci.yml'
+Run the same secret scan pattern from `.github/workflows/ci.yml`.
 ```
 
 - [x] **Step 4: Commit, push, tag**
