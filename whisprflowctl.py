@@ -339,6 +339,15 @@ def print_analysis(name: str, result: dict[str, Any]) -> None:
         print_json(result["recommendations"])
 
 
+def countdown(label: str, seconds: float) -> None:
+    whole_seconds = max(0, int(seconds))
+    if whole_seconds <= 0:
+        return
+    for remaining in range(whole_seconds, 0, -1):
+        print(f"{label} starts in {remaining}...", flush=True)
+        time.sleep(1)
+
+
 def cmd_config(args: argparse.Namespace) -> int:
     cfg = load_config(merged=args.action == "show")
     if args.action == "show":
@@ -571,11 +580,15 @@ def cmd_wizard(args: argparse.Namespace) -> int:
     prompt_enabled = not getattr(args, "no_prompt", False) and sys.stdin.isatty()
     if prompt_enabled:
         input("Press Enter, then click the button during the test window...")
+    else:
+        countdown("button test", float(getattr(args, "prep_seconds", 0)))
     button_code = cmd_test(argparse.Namespace(target="button", seconds=args.seconds, meter=True))
     print()
     print("mic test")
     if prompt_enabled:
         input("Press Enter, then say 'testing testing 123' during the test window...")
+    else:
+        countdown("mic test", float(getattr(args, "prep_seconds", 0)))
     mic_code = cmd_test(argparse.Namespace(target="mic", seconds=args.seconds, meter=True))
     if args.apply:
         print()
@@ -593,6 +606,7 @@ def build_parser() -> argparse.ArgumentParser:
     setup_sub = setup.add_subparsers(dest="setup_action")
     wizard = setup_sub.add_parser("wizard", help="run guided setup")
     wizard.add_argument("--seconds", type=float, default=6.0)
+    wizard.add_argument("--prep-seconds", type=float, default=3.0)
     wizard.add_argument("--apply", action="store_true")
     wizard.add_argument("--no-prompt", action="store_true")
     wizard.set_defaults(wizard=True)

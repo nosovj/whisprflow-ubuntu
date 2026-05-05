@@ -220,6 +220,33 @@ class CommandCliTests(unittest.TestCase):
         self.assertEqual(code, 0)
         prompt.assert_not_called()
 
+    def test_wizard_no_prompt_runs_countdown_before_each_phase(self):
+        cfg = {
+            "button_device": "button",
+            "mic_device": "mic",
+            "sample_rate": 16000,
+            "button_chunk_size": 1600,
+        }
+        samples = [[(100, 200), (4000, 9000)], [(40, 100), (900, 7000)]]
+
+        with mock.patch("whisprflowctl.cmd_doctor", return_value=0):
+            with mock.patch("whisprflowctl.cmd_summary", return_value=0):
+                with mock.patch("whisprflowctl.load_config", return_value=cfg):
+                    with mock.patch("whisprflowctl.sample_parecord_levels", side_effect=samples):
+                        with mock.patch("whisprflowctl.countdown") as countdown:
+                            code = whisprflowctl.main([
+                                "setup",
+                                "wizard",
+                                "--seconds",
+                                "1",
+                                "--no-prompt",
+                                "--prep-seconds",
+                                "2",
+                            ])
+
+        self.assertEqual(code, 0)
+        self.assertEqual(countdown.call_count, 2)
+
     def test_level_meter_formats_last_sample(self):
         self.assertEqual(whisprflowctl.format_level_meter("button", (123, 456)), "button avg=123 peak=456")
 

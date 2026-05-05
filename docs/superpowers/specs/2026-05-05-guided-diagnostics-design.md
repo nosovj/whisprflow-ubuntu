@@ -11,7 +11,7 @@ Make `whisprflowctl` useful for a real setup session, not just raw config edits.
 - `whisprflowctl test button [--seconds N] [--meter]`: sample the configured button source, ask the user to press/release the button, optionally print live level lines, report idle/active levels, verdict, and recommended thresholds.
 - `whisprflowctl test mic [--seconds N] [--meter]`: sample the configured speech mic, ask the user to speak, optionally print live level lines, report silence/speech levels, verdict, and recommended thresholds.
 - `whisprflowctl calibrate [--apply]`: run button and mic tests together. Without `--apply`, print a config patch. With `--apply`, save recommendations and restart the service.
-- `whisprflowctl setup wizard [--no-prompt]`: conversational wrapper around `doctor`, `summary`, `test button`, `test mic`, optional apply, and service restart. In an interactive terminal it waits for Enter before button and mic phases.
+- `whisprflowctl setup wizard [--no-prompt] [--prep-seconds N]`: conversational wrapper around `doctor`, `summary`, `test button`, `test mic`, optional apply, and service restart. In an interactive terminal it waits for Enter before button and mic phases. In non-interactive shells it prints a countdown before each phase.
 
 ## UX Rules
 

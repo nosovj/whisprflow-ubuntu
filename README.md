@@ -115,6 +115,12 @@ whisprflowctl setup wizard
 
 This checks the install, shows current config, waits for Enter before each phase, asks you to press the audio button, asks you to speak into the mic, then prints measured levels and recommended thresholds. Use `--no-prompt` for scripts.
 
+For non-interactive shells, use a countdown before each phase:
+
+```bash
+whisprflowctl setup wizard --no-prompt --prep-seconds 3
+```
+
 To write recommended thresholds and restart the service:
 
 ```bash
