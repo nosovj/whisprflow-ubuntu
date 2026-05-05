@@ -97,6 +97,7 @@ whisprflowctl config set button_device alsa_input.example
 whisprflowctl config unset mic_device
 whisprflowctl test button
 whisprflowctl test mic
+whisprflowctl test sources --prep-seconds 3
 whisprflowctl test button --meter
 whisprflowctl test mic --meter
 whisprflowctl calibrate
@@ -304,6 +305,7 @@ rm -f ~/.config/autostart/whisprflow.desktop
 - No mic input usually means PulseAudio/PipeWire default input is wrong. Check Ubuntu sound settings.
 - Audio button not triggering means `button_device`, `button_threshold`, or `button_peak_threshold` is wrong. Set `button_debug` to `true`, restart the service, and watch `journalctl --user -u whisprflow.service -f`.
 - Run `whisprflowctl test button` to check whether button levels are detectable and get threshold recommendations.
+- Run `whisprflowctl test sources --prep-seconds 3` if the configured button source stays flat. It watches all input sources and prints the source with the largest click spike.
 - Run `whisprflowctl test mic` to check whether speech is too quiet, too loud, clipped, or indistinguishable from silence.
 - Run `whisprflowctl config validate` before restarting after manual edits.
 - `pynput` failures on Wayland can require running under X11/XWayland, depending on compositor security policy.

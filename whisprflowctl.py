@@ -11,6 +11,7 @@ import struct
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 from pathlib import Path
 from typing import Any
@@ -176,7 +177,37 @@ def parse_value(value: str) -> Any:
 
 
 def run_command(cmd: list[str], check: bool = False) -> int:
-    return subprocess.run(cmd, check=check).returncode
+    try:
+        return subprocess.run(cmd, check=check).returncode
+    except FileNotFoundError:
+        return 127
+
+
+def env_first(*names: str, default: str = "") -> str:
+    for name in names:
+        value = os.environ.get(name)
+        if value:
+            return value
+    return default
+
+
+def apply_button_audio_settings(cfg: dict[str, Any]) -> None:
+    device = str(cfg.get("button_device") or "")
+    alsa_card = env_first("WHISPRFLOW_ALSA_CARD", "WHISPRTALK_ALSA_CARD")
+    mute_numid = env_first("WHISPRFLOW_ALSA_MUTE_NUMID", "WHISPRTALK_ALSA_MUTE_NUMID")
+    mute_value = env_first("WHISPRFLOW_ALSA_MUTE_VALUE", "WHISPRTALK_ALSA_MUTE_VALUE", default="0,0")
+    gain_numid = env_first("WHISPRFLOW_ALSA_GAIN_NUMID", "WHISPRTALK_ALSA_GAIN_NUMID")
+    gain_value = env_first("WHISPRFLOW_ALSA_GAIN_VALUE", "WHISPRTALK_ALSA_GAIN_VALUE", default="63,63")
+    button_port = env_first("WHISPRFLOW_BUTTON_PORT", "WHISPRTALK_BUTTON_PORT", default="analog-input-rear-mic")
+    button_volume = env_first("WHISPRFLOW_BUTTON_VOLUME", "WHISPRTALK_BUTTON_VOLUME", default="46%")
+
+    if alsa_card and mute_numid:
+        run_command(["amixer", "-c", alsa_card, "cset", f"numid={mute_numid}", mute_value], check=False)
+    if alsa_card and gain_numid:
+        run_command(["amixer", "-c", alsa_card, "cset", f"numid={gain_numid}", gain_value], check=False)
+    if device:
+        run_command(["pactl", "set-source-port", device, button_port], check=False)
+        run_command(["pactl", "set-source-volume", device, button_volume], check=False)
 
 
 def openwhispr_server_path() -> Path:
@@ -238,6 +269,29 @@ def analyze_button_levels(samples: list[tuple[int, int]]) -> dict[str, Any]:
         "button_release_below_sec": 999,
     }
     return {"verdict": verdict, "stats": stats, "recommendations": recommendations}
+
+
+def button_level_score(samples: list[tuple[int, int]]) -> int:
+    idle_group, active_group = sorted_level_groups(samples)
+    idle = level_stats(idle_group)
+    active = level_stats(active_group)
+    return max(0, active["avg"] - idle["avg"]) + max(0, active["peak"] - idle["peak"]) // 4
+
+
+def rank_source_levels(source_samples: dict[str, list[tuple[int, int]]]) -> list[dict[str, Any]]:
+    ranked = []
+    for source, samples in source_samples.items():
+        analysis = analyze_button_levels(samples)
+        ranked.append(
+            {
+                "source": source,
+                "score": button_level_score(samples),
+                "verdict": analysis["verdict"],
+                "stats": analysis["stats"],
+                "recommendations": analysis["recommendations"],
+            }
+        )
+    return sorted(ranked, key=lambda item: item["score"], reverse=True)
 
 
 def analyze_mic_levels(samples: list[tuple[int, int]]) -> dict[str, Any]:
@@ -329,6 +383,41 @@ def sample_parecord_levels(
         if error:
             print(f"parecord error: {error}", file=sys.stderr)
     return samples
+
+
+def list_pulse_sources() -> list[str]:
+    proc = subprocess.run(["pactl", "list", "short", "sources"], capture_output=True, text=True, check=False)
+    sources = []
+    for line in proc.stdout.splitlines():
+        parts = line.split()
+        if len(parts) >= 2 and not parts[1].endswith(".monitor"):
+            sources.append(parts[1])
+    return sources
+
+
+def sample_many_parecord_levels(
+    sources: list[str],
+    seconds: float,
+    sample_rate: int,
+    chunk_size: int = 1600,
+) -> dict[str, list[tuple[int, int]]]:
+    results: dict[str, list[tuple[int, int]]] = {source: [] for source in sources}
+    errors: dict[str, str] = {}
+
+    def worker(source: str) -> None:
+        try:
+            results[source] = sample_parecord_levels(source, seconds, sample_rate, chunk_size)
+        except Exception as exc:
+            errors[source] = str(exc)
+
+    threads = [threading.Thread(target=worker, args=(source,), daemon=True) for source in sources]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(timeout=float(seconds) + 5.0)
+    for source, error in errors.items():
+        print(f"{source}\terror\t{error}", file=sys.stderr)
+    return results
 
 
 def print_analysis(name: str, result: dict[str, Any]) -> None:
@@ -502,6 +591,7 @@ def cmd_test(args: argparse.Namespace) -> int:
     seconds = float(args.seconds)
     if args.target == "button":
         device = str(cfg.get("button_device") or "")
+        apply_button_audio_settings(cfg)
         print(f"listening to button source: {device}")
         print(f"press and release the button for {seconds:g}s")
         samples = sample_parecord_levels(
@@ -528,6 +618,44 @@ def cmd_test(args: argparse.Namespace) -> int:
         result = analyze_mic_levels(samples)
         print_analysis("mic", result)
         return 0 if result["verdict"] == "good" else 1
+    if args.target == "sources":
+        apply_button_audio_settings(cfg)
+        sources = list_pulse_sources()
+        if not sources:
+            print("no PulseAudio/PipeWire input sources found", file=sys.stderr)
+            return 1
+        print("watching input sources:")
+        for source in sources:
+            marker = " (configured button)" if source == cfg.get("button_device") else ""
+            print(f"- {source}{marker}")
+        countdown("source test", float(getattr(args, "prep_seconds", 0)))
+        print(f"click the button during the {seconds:g}s test window")
+        samples = sample_many_parecord_levels(
+            sources,
+            seconds,
+            sample_rate,
+            int(cfg.get("button_chunk_size", 1600)),
+        )
+        ranked = rank_source_levels(samples)
+        print("source ranking:")
+        for item in ranked:
+            stats = item["stats"]
+            marker = " *configured*" if item["source"] == cfg.get("button_device") else ""
+            print(
+                f"{item['source']}{marker}\tscore={item['score']}\tverdict={item['verdict']}\t"
+                f"idle_avg={stats['idle']['avg']}\tactive_avg={stats['active']['avg']}\t"
+                f"active_peak={stats['active']['peak']}"
+            )
+        if ranked:
+            best = ranked[0]
+            print(f"best_source\t{best['source']}")
+            if best["source"] != cfg.get("button_device") and best["verdict"] == "good":
+                print(f"set_command\twhisprflowctl config set button_device {best['source']}")
+            if best["verdict"] != "good":
+                print("no source showed a clear button spike")
+                return 1
+            return 0
+        return 1
     raise ValueError(f"unknown test target: {args.target}")
 
 
@@ -535,6 +663,7 @@ def cmd_calibrate(args: argparse.Namespace) -> int:
     cfg = load_config(merged=True)
     sample_rate = int(cfg.get("sample_rate", 16000))
     seconds = float(args.seconds)
+    apply_button_audio_settings(cfg)
     print("button calibration")
     button_samples = sample_parecord_levels(
         str(cfg.get("button_device") or ""),
@@ -642,9 +771,10 @@ def build_parser() -> argparse.ArgumentParser:
 
     test = sub.add_parser("test", help="test audio button or mic")
     test_sub = test.add_subparsers(dest="target", required=True)
-    for target in ("button", "mic"):
+    for target in ("button", "mic", "sources"):
         target_parser = test_sub.add_parser(target)
         target_parser.add_argument("--seconds", type=float, default=6.0)
+        target_parser.add_argument("--prep-seconds", type=float, default=0.0)
         target_parser.add_argument("--meter", action="store_true")
     test.set_defaults(func=cmd_test)
 
