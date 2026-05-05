@@ -26,6 +26,10 @@ import sounddevice as sd
 from pynput import keyboard
 
 
+APP_DIR_NAME = "whisprflow-ubuntu"
+CONFIG_DIR_NAME = "whisprflow"
+LEGACY_CONFIG_DIR_NAME = "whisprtalk"
+
 DEFAULT_CONFIG: dict[str, Any] = {
     "provider": "local_openwhispr",
     "trigger": "keyboard",
@@ -72,9 +76,9 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "paste_method": "auto",
     "play_beeps": True,
     "release_tail_sec": 0.2,
-    "keep_failed_wav": str(Path.home() / "whisprtalk" / "last_failed.wav"),
-    "status_file": str(Path.home() / "whisprtalk" / "status.txt"),
-    "hud_file": str(Path.home() / "whisprtalk" / "hud.txt"),
+    "keep_failed_wav": str(Path.home() / APP_DIR_NAME / "last_failed.wav"),
+    "status_file": str(Path.home() / APP_DIR_NAME / "status.txt"),
+    "hud_file": str(Path.home() / APP_DIR_NAME / "hud.txt"),
     "hud_preview_chars": 48,
 }
 
@@ -104,8 +108,14 @@ BRACKETED_NOISE_RE = re.compile(r"\s*[\[(][^\])]{1,80}[\])]\s*")
 def config_path() -> Path:
     base = os.environ.get("XDG_CONFIG_HOME")
     if base:
-        return Path(base) / "whisprtalk" / "config.json"
-    return Path.home() / ".config" / "whisprtalk" / "config.json"
+        config_root = Path(base)
+    else:
+        config_root = Path.home() / ".config"
+    path = config_root / CONFIG_DIR_NAME / "config.json"
+    legacy_path = config_root / LEGACY_CONFIG_DIR_NAME / "config.json"
+    if not path.exists() and legacy_path.exists():
+        return legacy_path
+    return path
 
 
 def load_config() -> dict[str, Any]:
@@ -862,7 +872,7 @@ def transcribe(path: str, cfg: dict[str, Any]) -> str:
 def transcribe_openai(path: str, cfg: dict[str, Any]) -> str:
     api_key = os.environ.get("OPENAI_API_KEY")
     if not api_key:
-        raise RuntimeError("OPENAI_API_KEY missing; export it or use ~/whisprtalk/run.sh")
+        raise RuntimeError("OPENAI_API_KEY missing; export it or use ~/whisprflow-ubuntu/run.sh")
 
     data: dict[str, str] = {
         "model": str(cfg["model"]),
@@ -1138,7 +1148,7 @@ def capture_key() -> None:
         raise SystemExit(1)
 
 
-class WhisprTalk:
+class WhisprFlow:
     def __init__(self, cfg: dict[str, Any]) -> None:
         self.cfg = cfg
         self.expected_key = parse_single_key(str(cfg["hotkey"]))
@@ -1570,7 +1580,7 @@ def main() -> int:
         return 0
 
     cfg = load_config()
-    app = WhisprTalk(cfg)
+    app = WhisprFlow(cfg)
     app.run()
     return 0
 

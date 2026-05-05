@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Small non-focus dictation HUD for WhisprTalk."""
+"""Small non-focus dictation HUD for WhisprFlow."""
 
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ gi.require_version("Gdk", "3.0")
 from gi.repository import Gdk, GLib, Gtk  # noqa: E402
 
 
-class WhisprTalkHud:
+class WhisprFlowHud:
     def __init__(self, hud_path: Path) -> None:
         self.hud_path = hud_path
         self.last_text = ""
@@ -25,7 +25,7 @@ class WhisprTalkHud:
         self.window.set_accept_focus(False)
         self.window.set_focus_on_map(False)
         self.window.set_resizable(False)
-        self.window.set_name("whisprtalk-hud")
+        self.window.set_name("whisprflow-hud")
 
         self.label = Gtk.Label()
         self.label.set_xalign(0.5)
@@ -37,12 +37,12 @@ class WhisprTalkHud:
         self.window.add(self.label)
 
         css = b"""
-        #whisprtalk-hud {
+        #whisprflow-hud {
           background: rgba(20, 24, 32, 0.88);
           border-radius: 8px;
           border: 1px solid rgba(100, 255, 218, 0.65);
         }
-        #whisprtalk-hud label {
+        #whisprflow-hud label {
           color: #64ffda;
           font: 11pt "JetBrains Mono";
         }
@@ -93,8 +93,8 @@ class WhisprTalkHud:
 
 
 def main() -> int:
-    hud_path = Path(sys.argv[1]) if len(sys.argv) > 1 else Path.home() / "whisprtalk" / "hud.txt"
-    WhisprTalkHud(hud_path).run()
+    hud_path = Path(sys.argv[1]) if len(sys.argv) > 1 else Path.home() / "whisprflow-ubuntu" / "hud.txt"
+    WhisprFlowHud(hud_path).run()
     return 0
 
 

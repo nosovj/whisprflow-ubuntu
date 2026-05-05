@@ -8,7 +8,7 @@ from unittest import mock
 
 import numpy as np
 
-import whisprtalk
+import whisprflow
 
 
 class LocalOpenWhisprTests(unittest.TestCase):
@@ -21,8 +21,8 @@ class LocalOpenWhisprTests(unittest.TestCase):
         with tempfile.NamedTemporaryFile(suffix=".wav") as wav:
             wav.write(b"RIFFfake")
             wav.flush()
-            with mock.patch("whisprtalk.requests.post", return_value=response) as post:
-                text = whisprtalk.transcribe_local_openwhispr(
+            with mock.patch("whisprflow.requests.post", return_value=response) as post:
+                text = whisprflow.transcribe_local_openwhispr(
                     wav.name,
                     {
                         "local_url": "http://127.0.0.1:8180/inference",
@@ -40,8 +40,8 @@ class LocalOpenWhisprTests(unittest.TestCase):
     def test_transcribe_dispatches_to_local_without_api_key(self):
         old_key = os.environ.pop("OPENAI_API_KEY", None)
         try:
-            with mock.patch("whisprtalk.transcribe_local_openwhispr", return_value="local text") as local:
-                text = whisprtalk.transcribe(
+            with mock.patch("whisprflow.transcribe_local_openwhispr", return_value="local text") as local:
+                text = whisprflow.transcribe(
                     "/tmp/fake.wav",
                     {"provider": "local_openwhispr", "local_url": "http://127.0.0.1:8180/inference"},
                 )
@@ -54,38 +54,38 @@ class LocalOpenWhisprTests(unittest.TestCase):
 
     def test_local_error_response_raises_instead_of_pasting_json(self):
         with self.assertRaisesRegex(RuntimeError, "failed to read audio data"):
-            whisprtalk.parse_local_response('{"error":"failed to read audio data"}', "application/json")
+            whisprflow.parse_local_response('{"error":"failed to read audio data"}', "application/json")
 
     def test_noise_transcripts_are_skipped(self):
-        self.assertTrue(whisprtalk.is_noise_transcript("Thank you."))
-        self.assertTrue(whisprtalk.is_noise_transcript("."))
-        self.assertTrue(whisprtalk.is_noise_transcript("-"))
-        self.assertTrue(whisprtalk.is_noise_transcript("(clicks tongue)"))
-        self.assertTrue(whisprtalk.is_noise_transcript("(gentle music)"))
-        self.assertTrue(whisprtalk.is_noise_transcript("[applause]"))
-        self.assertTrue(whisprtalk.is_noise_transcript("[typing]"))
-        self.assertEqual(whisprtalk.clean_transcript("li[applause]ke"), "like")
-        self.assertFalse(whisprtalk.is_noise_transcript("Testing one two three."))
+        self.assertTrue(whisprflow.is_noise_transcript("Thank you."))
+        self.assertTrue(whisprflow.is_noise_transcript("."))
+        self.assertTrue(whisprflow.is_noise_transcript("-"))
+        self.assertTrue(whisprflow.is_noise_transcript("(clicks tongue)"))
+        self.assertTrue(whisprflow.is_noise_transcript("(gentle music)"))
+        self.assertTrue(whisprflow.is_noise_transcript("[applause]"))
+        self.assertTrue(whisprflow.is_noise_transcript("[typing]"))
+        self.assertEqual(whisprflow.clean_transcript("li[applause]ke"), "like")
+        self.assertFalse(whisprflow.is_noise_transcript("Testing one two three."))
 
     def test_hud_preview_text_is_single_line_and_capped(self):
-        text = whisprtalk.hud_preview_text("Testing\none two three four five", max_chars=18)
+        text = whisprflow.hud_preview_text("Testing\none two three four five", max_chars=18)
 
         self.assertEqual(text, "Testing one two...")
 
     def test_hud_preview_text_hides_empty_text(self):
-        self.assertEqual(whisprtalk.hud_preview_text("   "), "")
+        self.assertEqual(whisprflow.hud_preview_text("   "), "")
 
 
 class AudioButtonTests(unittest.TestCase):
     def test_average_amplitude_reads_int16_samples(self):
         data = struct.pack("<4h", -100, 200, -300, 400)
 
-        self.assertEqual(whisprtalk.average_amplitude(data), 250)
-        self.assertEqual(whisprtalk.audio_levels(data), (250, 400))
+        self.assertEqual(whisprflow.average_amplitude(data), 250)
+        self.assertEqual(whisprflow.audio_levels(data), (250, 400))
 
     def test_button_monitor_fires_press_and_release_after_debounce(self):
         events = []
-        detector = whisprtalk.AudioButtonDetector(
+        detector = whisprflow.AudioButtonDetector(
             threshold=1000,
             peak_threshold=3000,
             peak_min_average=900,
@@ -107,7 +107,7 @@ class AudioButtonTests(unittest.TestCase):
 
     def test_button_monitor_waits_for_sustained_low_before_release(self):
         events = []
-        detector = whisprtalk.AudioButtonDetector(
+        detector = whisprflow.AudioButtonDetector(
             threshold=1000,
             peak_threshold=3000,
             peak_min_average=900,
@@ -130,7 +130,7 @@ class AudioButtonTests(unittest.TestCase):
 
     def test_button_monitor_fires_on_peak_click(self):
         events = []
-        detector = whisprtalk.AudioButtonDetector(
+        detector = whisprflow.AudioButtonDetector(
             threshold=3000,
             peak_threshold=7000,
             peak_min_average=2000,
@@ -152,7 +152,7 @@ class AudioButtonTests(unittest.TestCase):
 
     def test_button_monitor_ignores_isolated_peak_noise(self):
         events = []
-        detector = whisprtalk.AudioButtonDetector(
+        detector = whisprflow.AudioButtonDetector(
             threshold=2300,
             peak_threshold=9000,
             peak_min_average=2200,
@@ -173,7 +173,7 @@ class AudioButtonTests(unittest.TestCase):
     def test_button_monitor_requires_idle_rearm_after_press_decay(self):
         events = []
         now = [0.0]
-        detector = whisprtalk.AudioButtonDetector(
+        detector = whisprflow.AudioButtonDetector(
             threshold=120,
             peak_threshold=500,
             peak_min_average=90,
@@ -214,7 +214,7 @@ class AudioButtonTests(unittest.TestCase):
         self.assertEqual(events, ["press", "press"])
 
     def test_ring_recorder_includes_preroll_when_started(self):
-        recorder = whisprtalk.RingRecorder(sample_rate=4, channels=1, preroll_sec=0.5)
+        recorder = whisprflow.RingRecorder(sample_rate=4, channels=1, preroll_sec=0.5)
         recorder._recording = False
         recorder._accept_frame(np.array([[1], [2]], dtype=np.int16))
 
@@ -226,7 +226,7 @@ class AudioButtonTests(unittest.TestCase):
         self.assertEqual(duration, 1.0)
 
     def test_parecord_ring_recorder_accepts_raw_bytes(self):
-        recorder = whisprtalk.ParecordRingRecorder(sample_rate=4, channels=1, preroll_sec=0.5, device="mic")
+        recorder = whisprflow.ParecordRingRecorder(sample_rate=4, channels=1, preroll_sec=0.5, device="mic")
         recorder._accept_raw(struct.pack("<2h", 10, 20))
 
         recorder.start()
@@ -238,7 +238,7 @@ class AudioButtonTests(unittest.TestCase):
 
     def test_ring_recorder_marks_autostop_after_speech_then_silence(self):
         now = [0.0]
-        recorder = whisprtalk.RingRecorder(
+        recorder = whisprflow.RingRecorder(
             sample_rate=4,
             channels=1,
             preroll_sec=0.0,
@@ -260,7 +260,7 @@ class AudioButtonTests(unittest.TestCase):
 
     def test_ring_recorder_uses_longer_no_speech_grace(self):
         now = [0.0]
-        recorder = whisprtalk.RingRecorder(
+        recorder = whisprflow.RingRecorder(
             sample_rate=4,
             channels=1,
             preroll_sec=0.0,
@@ -281,7 +281,7 @@ class AudioButtonTests(unittest.TestCase):
     def test_select_audio_channel_keeps_single_requested_channel(self):
         audio = np.array([[1, 10], [2, 20], [3, 30]], dtype=np.int16)
 
-        selected = whisprtalk.select_audio_channel(audio, 0)
+        selected = whisprflow.select_audio_channel(audio, 0)
 
         self.assertEqual(selected.reshape(-1).tolist(), [1, 2, 3])
         self.assertEqual(selected.shape, (3, 1))
@@ -296,7 +296,7 @@ class AudioButtonTests(unittest.TestCase):
                 wf.setframerate(16000)
                 wf.writeframes(np.array([[1, 10], [2, 20], [3, 30]], dtype=np.int16).tobytes())
 
-            selected_path = whisprtalk.wav_with_selected_channel(original.name, 1)
+            selected_path = whisprflow.wav_with_selected_channel(original.name, 1)
             try:
                 with wave.open(selected_path, "rb") as wf:
                     data = np.frombuffer(wf.readframes(wf.getnframes()), dtype=np.int16)
@@ -317,14 +317,14 @@ class AudioButtonTests(unittest.TestCase):
                 wf.setframerate(16000)
                 wf.writeframes(np.array([-100, 200, -300], dtype=np.int16).tobytes())
 
-            self.assertEqual(whisprtalk.wav_mean_abs(original.name), 200)
+            self.assertEqual(whisprflow.wav_mean_abs(original.name), 200)
         finally:
             os.unlink(original.name)
 
 
 class PhraseSegmenterTests(unittest.TestCase):
     def test_phrase_segmenter_finalizes_after_short_silence(self):
-        segmenter = whisprtalk.PhraseSegmenter(
+        segmenter = whisprflow.PhraseSegmenter(
             sample_rate=10,
             channels=1,
             preroll_sec=0.0,
@@ -343,7 +343,7 @@ class PhraseSegmenterTests(unittest.TestCase):
         self.assertFalse(segmenter.should_stop())
 
     def test_phrase_segmenter_detects_peaky_speech_below_average_threshold(self):
-        segmenter = whisprtalk.PhraseSegmenter(
+        segmenter = whisprflow.PhraseSegmenter(
             sample_rate=10,
             channels=1,
             preroll_sec=0.0,
@@ -363,7 +363,7 @@ class PhraseSegmenterTests(unittest.TestCase):
         self.assertEqual(finalized[0].reshape(-1).tolist(), [80, 2000, 0, 0])
 
     def test_phrase_segmenter_keeps_preroll_before_speech(self):
-        segmenter = whisprtalk.PhraseSegmenter(
+        segmenter = whisprflow.PhraseSegmenter(
             sample_rate=10,
             channels=1,
             preroll_sec=0.2,
@@ -381,7 +381,7 @@ class PhraseSegmenterTests(unittest.TestCase):
         self.assertEqual(finalized[0].reshape(-1).tolist(), [1, 2, 200, 220, 0, 0])
 
     def test_phrase_segmenter_stops_after_long_silence_following_phrase(self):
-        segmenter = whisprtalk.PhraseSegmenter(
+        segmenter = whisprflow.PhraseSegmenter(
             sample_rate=10,
             channels=1,
             preroll_sec=0.0,

@@ -8,9 +8,10 @@ Unofficial WhisprFlow-style dictation for Ubuntu/Linux. Hold the audio-jack butt
 sudo apt update
 sudo apt install -y python3-venv portaudio19-dev xdotool wl-clipboard xclip
 
-mkdir -p ~/whisprtalk
-python3 -m venv ~/whisprtalk/.venv
-source ~/whisprtalk/.venv/bin/activate
+git clone https://github.com/nosovj/whisprflow-ubuntu.git ~/whisprflow-ubuntu
+cd ~/whisprflow-ubuntu
+python3 -m venv .venv
+source .venv/bin/activate
 pip install --upgrade pip
 pip install sounddevice numpy pynput requests
 ```
@@ -31,25 +32,25 @@ Local transcription uses an existing OpenWhispr/whisper.cpp-compatible server. T
 Override the model path with:
 
 ```bash
-WHISPRTALK_MODEL=/path/to/ggml-model.bin ~/whisprtalk/run.sh
+WHISPRFLOW_MODEL=/path/to/ggml-model.bin ~/whisprflow-ubuntu/run.sh
 ```
 
 ## Configure Key
 
 ```bash
-~/whisprtalk/run.sh --capture-key
+~/whisprflow-ubuntu/run.sh --capture-key
 ```
 
 Press the macropad button once. The key is saved to:
 
 ```text
-~/.config/whisprtalk/config.json
+~/.config/whisprflow/config.json
 ```
 
 ## Run
 
 ```bash
-~/whisprtalk/run.sh
+~/whisprflow-ubuntu/run.sh
 ```
 
 Hold the configured button, speak, release. The transcript is pasted into the currently focused app.
@@ -57,9 +58,9 @@ Hold the configured button, speak, release. The transcript is pasted into the cu
 The installed setup runs as a user service:
 
 ```bash
-systemctl --user status whisprtalk.service
-systemctl --user restart whisprtalk.service
-journalctl --user -u whisprtalk.service -f
+systemctl --user status whisprflow.service
+systemctl --user restart whisprflow.service
+journalctl --user -u whisprflow.service -f
 ```
 
 ## Config
@@ -180,22 +181,22 @@ Working config from that machine:
 Optional local tuning for similar audio-jack button setups:
 
 ```bash
-export WHISPRTALK_ALSA_CARD=3
-export WHISPRTALK_ALSA_MUTE_NUMID=13
-export WHISPRTALK_ALSA_MUTE_VALUE=0,0
-export WHISPRTALK_ALSA_GAIN_NUMID=11
-export WHISPRTALK_ALSA_GAIN_VALUE=63,63
-export WHISPRTALK_BUTTON_PORT=analog-input-rear-mic
-export WHISPRTALK_BUTTON_VOLUME=46%
+export WHISPRFLOW_ALSA_CARD=3
+export WHISPRFLOW_ALSA_MUTE_NUMID=13
+export WHISPRFLOW_ALSA_MUTE_VALUE=0,0
+export WHISPRFLOW_ALSA_GAIN_NUMID=11
+export WHISPRFLOW_ALSA_GAIN_VALUE=63,63
+export WHISPRFLOW_BUTTON_PORT=analog-input-rear-mic
+export WHISPRFLOW_BUTTON_VOLUME=46%
 ```
 
 ## Autostart
 
 Autostart is installed. Login starts:
 
-- `~/.config/autostart/whisprtalk.desktop`
-- `~/whisprtalk/autostart.sh`
-- `~/.config/systemd/user/whisprtalk.service`
+- `~/.config/autostart/whisprflow.desktop`
+- `~/whisprflow-ubuntu/autostart.sh`
+- `~/.config/systemd/user/whisprflow.service`
 
 The desktop entry imports GUI session variables into systemd, then restarts the service. This matters because X11 typing needs `DISPLAY`.
 
@@ -203,19 +204,14 @@ To re-enable manually:
 
 ```bash
 systemctl --user daemon-reload
-systemctl --user enable --now whisprtalk.service
+systemctl --user enable --now whisprflow.service
 ```
-
-Old autostarts are disabled:
-
-- `~/.config/autostart/voice-to-text.desktop`
-- `~/.config/autostart/whisper-server.desktop`
 
 ## Troubleshooting
 
-- `OPENAI_API_KEY missing`: run through `~/whisprtalk/run.sh` or export the variable.
+- `OPENAI_API_KEY missing`: run through `~/whisprflow-ubuntu/run.sh` or export the variable.
 - Wayland direct typing needs `wtype`. Without it, clipboard fallback may copy text and require Ctrl+V.
-- Garbled X11 typing can mean the target app is dropping fast keystrokes. Raise the `xdotool` delay in `whisprtalk.py`.
+- Garbled X11 typing can mean the target app is dropping fast keystrokes. Raise the `xdotool` delay in `whisprflow.py`.
 - No mic input usually means PulseAudio/PipeWire default input is wrong. Check Ubuntu sound settings.
-- Audio button not triggering means `button_device`, `button_threshold`, or `button_peak_threshold` is wrong. Set `button_debug` to `true`, restart the service, and watch `journalctl --user -u whisprtalk.service -f`.
+- Audio button not triggering means `button_device`, `button_threshold`, or `button_peak_threshold` is wrong. Set `button_debug` to `true`, restart the service, and watch `journalctl --user -u whisprflow.service -f`.
 - `pynput` failures on Wayland can require running under X11/XWayland, depending on compositor security policy.
