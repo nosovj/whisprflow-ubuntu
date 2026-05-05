@@ -21,6 +21,19 @@ Wayland users should also install `wtype` when available:
 sudo apt install -y wtype
 ```
 
+Local transcription uses an existing OpenWhispr/whisper.cpp-compatible server. This repo does not install OpenWhispr or download speech-to-text models yet. `run.sh` expects:
+
+```text
+~/openwhispr/dist/linux-unpacked/resources/bin/whisper-server-linux-x64
+~/.cache/openwhispr/whisper-models/ggml-base.bin
+```
+
+Override the model path with:
+
+```bash
+WHISPRTALK_MODEL=/path/to/ggml-model.bin ~/whisprtalk/run.sh
+```
+
 ## Configure Key
 
 ```bash
@@ -125,7 +138,8 @@ This repo was built against one Ubuntu desktop setup:
 - Speech mic: `alsa_input.usb-Samson_Technologies_Samson_G-Track_Pro_A7F52D1227153B00-00.analog-stereo`
 - Paste path: X11 `xdotool`
 - Transcription: local OpenWhispr whisper.cpp-compatible server at `http://127.0.0.1:8180/inference`
-- Model path used by `run.sh`: `$HOME/.cache/openwhispr/whisper-models/ggml-base.bin`
+- GPU on tested machine: NVIDIA RTX 5090
+- STT model used by `run.sh`: `$HOME/.cache/openwhispr/whisper-models/ggml-base.bin`
 
 Working config from that machine:
 
