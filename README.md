@@ -89,15 +89,34 @@ Useful CLI commands:
 
 ```bash
 whisprflowctl doctor
+whisprflowctl summary
+whisprflowctl config validate
 whisprflowctl config show
 whisprflowctl config set trigger audio_button
 whisprflowctl config set button_device alsa_input.example
 whisprflowctl config unset mic_device
+whisprflowctl test button
+whisprflowctl test mic
+whisprflowctl calibrate
 whisprflowctl service restart
 whisprflowctl logs -n 120
 whisprflowctl model list
 whisprflowctl model install large-v3-turbo
 whisprflowctl openwhispr pin dac4a1ba
+```
+
+Guided setup:
+
+```bash
+whisprflowctl setup wizard
+```
+
+This checks the install, shows current config, asks you to press the audio button, asks you to speak into the mic, then prints measured levels and recommended thresholds.
+
+To write recommended thresholds and restart the service:
+
+```bash
+whisprflowctl calibrate --apply
 ```
 
 ## Run
@@ -276,4 +295,7 @@ rm -f ~/.config/autostart/whisprflow.desktop
 - Garbled X11 typing can mean the target app is dropping fast keystrokes. Raise the `xdotool` delay in `whisprflow.py`.
 - No mic input usually means PulseAudio/PipeWire default input is wrong. Check Ubuntu sound settings.
 - Audio button not triggering means `button_device`, `button_threshold`, or `button_peak_threshold` is wrong. Set `button_debug` to `true`, restart the service, and watch `journalctl --user -u whisprflow.service -f`.
+- Run `whisprflowctl test button` to check whether button levels are detectable and get threshold recommendations.
+- Run `whisprflowctl test mic` to check whether speech is too quiet, too loud, clipped, or indistinguishable from silence.
+- Run `whisprflowctl config validate` before restarting after manual edits.
 - `pynput` failures on Wayland can require running under X11/XWayland, depending on compositor security policy.

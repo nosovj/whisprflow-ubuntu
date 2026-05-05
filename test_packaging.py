@@ -27,6 +27,9 @@ class PackagingTests(unittest.TestCase):
         self.assertIn("downloads the default STT model", readme)
         self.assertIn("OPENWHISPR_REF", readme)
         self.assertIn("whisprflowctl doctor", readme)
+        self.assertIn("whisprflowctl setup wizard", readme)
+        self.assertIn("whisprflowctl test button", readme)
+        self.assertIn("whisprflowctl calibrate --apply", readme)
 
     def test_ci_runs_unit_shell_and_secret_checks(self):
         workflow = (ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")

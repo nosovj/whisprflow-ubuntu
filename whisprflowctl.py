@@ -7,9 +7,11 @@ import argparse
 import json
 import os
 import shutil
+import struct
 import subprocess
 import sys
 import tempfile
+import time
 from pathlib import Path
 from typing import Any
 
@@ -25,6 +27,10 @@ MODEL_FILES = {
     "large-v3-turbo": "ggml-large-v3-turbo.bin",
     "turbo": "ggml-large-v3-turbo.bin",
 }
+PROVIDERS = {"local_openwhispr", "openai"}
+TRIGGERS = {"keyboard", "audio_button"}
+PASTE_METHODS = {"auto", "xdotool", "wtype", "ydotool", "clipboard"}
+BUTTON_STOP_MODES = {"silence", "release"}
 
 
 DEFAULT_CONFIG: dict[str, Any] = {
@@ -78,6 +84,50 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "hud_file": str(Path.home() / APP_DIR_NAME / "hud.txt"),
     "hud_preview_chars": 48,
 }
+
+
+def config_value_error(key: str, value: Any) -> str | None:
+    if key not in DEFAULT_CONFIG:
+        return f"unknown config key {key!r}"
+    default = DEFAULT_CONFIG[key]
+    if key == "provider" and value not in PROVIDERS:
+        return f"provider must be one of {sorted(PROVIDERS)}"
+    if key == "trigger" and value not in TRIGGERS:
+        return f"trigger must be one of {sorted(TRIGGERS)}"
+    if key == "paste_method" and value not in PASTE_METHODS:
+        return f"paste_method must be one of {sorted(PASTE_METHODS)}"
+    if key == "button_stop_mode" and value not in BUTTON_STOP_MODES:
+        return f"button_stop_mode must be one of {sorted(BUTTON_STOP_MODES)}"
+    if default is None:
+        if value is None or isinstance(value, str):
+            return None
+        return f"{key} must be null or string"
+    if isinstance(default, bool):
+        if isinstance(value, bool):
+            return None
+        return f"{key} must be boolean"
+    if isinstance(default, int):
+        if isinstance(value, int) and not isinstance(value, bool):
+            return None
+        return f"{key} must be integer"
+    if isinstance(default, float):
+        if isinstance(value, (int, float)) and not isinstance(value, bool):
+            return None
+        return f"{key} must be number"
+    if isinstance(default, str):
+        if isinstance(value, str):
+            return None
+        return f"{key} must be string"
+    return None
+
+
+def validate_config(cfg: dict[str, Any]) -> list[str]:
+    errors = []
+    for key, value in cfg.items():
+        error = config_value_error(key, value)
+        if error:
+            errors.append(error)
+    return errors
 
 
 def config_path() -> Path:
@@ -140,6 +190,132 @@ def print_json(value: Any) -> None:
     print(json.dumps(value, indent=2, sort_keys=True))
 
 
+def sorted_level_groups(samples: list[tuple[int, int]]) -> tuple[list[tuple[int, int]], list[tuple[int, int]]]:
+    if not samples:
+        return [], []
+    ordered = sorted(samples, key=lambda item: (item[0], item[1]))
+    group_size = max(1, len(ordered) // 3)
+    return ordered[:group_size], ordered[-group_size:]
+
+
+def level_stats(samples: list[tuple[int, int]]) -> dict[str, int]:
+    if not samples:
+        return {"avg": 0, "peak": 0}
+    return {
+        "avg": sum(avg for avg, _peak in samples) // len(samples),
+        "peak": max(peak for _avg, peak in samples),
+    }
+
+
+def analyze_button_levels(samples: list[tuple[int, int]]) -> dict[str, Any]:
+    idle_group, active_group = sorted_level_groups(samples)
+    idle = level_stats(idle_group)
+    active = level_stats(active_group)
+    spread_avg = active["avg"] - idle["avg"]
+    spread_peak = active["peak"] - idle["peak"]
+    stats = {"idle": idle, "active": active, "samples": len(samples)}
+
+    if len(samples) < 2 or (spread_avg < 500 and spread_peak < 1500):
+        return {"verdict": "button not detected", "stats": stats, "recommendations": {}}
+    if active["peak"] >= 32000:
+        verdict = "button signal clipping"
+    elif spread_avg < 1200 and spread_peak < 4000:
+        verdict = "button too quiet"
+    else:
+        verdict = "good"
+
+    threshold = max(200, idle["avg"] + max(300, int(spread_avg * 0.35)))
+    peak_threshold = max(1000, idle["peak"] + max(1000, int(spread_peak * 0.35)))
+    recommendations = {
+        "button_threshold": int(threshold),
+        "button_peak_threshold": int(peak_threshold),
+        "button_peak_min_average": max(150, int(threshold * 0.65)),
+        "button_press_chunks": 2,
+        "button_rearm_threshold": max(100, int(idle["avg"] * 2.5)),
+        "button_rearm_peak_threshold": max(500, int(idle["peak"] * 2.5)),
+        "button_rearm_chunks": 10,
+        "button_release_threshold": 0,
+        "button_release_below_sec": 999,
+    }
+    return {"verdict": verdict, "stats": stats, "recommendations": recommendations}
+
+
+def analyze_mic_levels(samples: list[tuple[int, int]]) -> dict[str, Any]:
+    silence_group, speech_group = sorted_level_groups(samples)
+    silence = level_stats(silence_group)
+    speech = level_stats(speech_group)
+    spread_avg = speech["avg"] - silence["avg"]
+    spread_peak = speech["peak"] - silence["peak"]
+    stats = {"silence": silence, "speech": speech, "samples": len(samples)}
+
+    if len(samples) < 2 or (spread_avg < 100 and speech["peak"] < 2500):
+        return {"verdict": "speech not detected", "stats": stats, "recommendations": {}}
+    if speech["peak"] >= 32000:
+        verdict = "mic clipping"
+    elif speech["avg"] < 180:
+        verdict = "mic too quiet"
+    else:
+        verdict = "good"
+
+    speech_threshold = max(120, silence["avg"] + max(120, int(spread_avg * 0.35)))
+    peak_threshold = max(800, silence["peak"] + max(800, int(spread_peak * 0.35)))
+    recommendations = {
+        "mic_min_mean_abs": max(80, int(speech_threshold * 0.4)),
+        "mic_speech_threshold": int(speech_threshold),
+        "mic_speech_peak_threshold": int(peak_threshold),
+        "mic_speech_peak_min_average": max(80, int(speech_threshold * 0.25)),
+    }
+    return {"verdict": verdict, "stats": stats, "recommendations": recommendations}
+
+
+def audio_levels(data: bytes) -> tuple[int, int]:
+    sample_count = len(data) // 2
+    if sample_count <= 0:
+        return 0, 0
+    samples = struct.unpack(f"<{sample_count}h", data[: sample_count * 2])
+    abs_samples = [abs(sample) for sample in samples]
+    return sum(abs_samples) // sample_count, max(abs_samples)
+
+
+def sample_parecord_levels(device: str, seconds: float, sample_rate: int, chunk_size: int = 1600) -> list[tuple[int, int]]:
+    if not device:
+        raise ValueError("audio device is not configured")
+    cmd = [
+        "parecord",
+        f"--device={device}",
+        "--channels=1",
+        f"--rate={int(sample_rate)}",
+        "--raw",
+        "--file-format=raw",
+    ]
+    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+    samples: list[tuple[int, int]] = []
+    deadline = time.monotonic() + float(seconds)
+    try:
+        assert proc.stdout is not None
+        while time.monotonic() < deadline:
+            data = proc.stdout.read(max(1, int(chunk_size)) * 2)
+            if not data:
+                break
+            samples.append(audio_levels(data))
+    finally:
+        proc.terminate()
+        try:
+            proc.wait(timeout=3)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            proc.wait(timeout=3)
+    return samples
+
+
+def print_analysis(name: str, result: dict[str, Any]) -> None:
+    print(f"{name} verdict: {result['verdict']}")
+    print_json(result["stats"])
+    if result["recommendations"]:
+        print("recommended config:")
+        print_json(result["recommendations"])
+
+
 def cmd_config(args: argparse.Namespace) -> int:
     cfg = load_config(merged=args.action == "show")
     if args.action == "show":
@@ -152,7 +328,12 @@ def cmd_config(args: argparse.Namespace) -> int:
         return 0
     if args.action == "set":
         cfg = load_config(merged=False)
-        cfg[args.key] = parse_value(args.value)
+        value = parse_value(args.value)
+        error = config_value_error(args.key, value)
+        if error:
+            print(error, file=sys.stderr)
+            return 2
+        cfg[args.key] = value
         save_config(cfg)
         print(f"set {args.key}")
         return 0
@@ -161,6 +342,14 @@ def cmd_config(args: argparse.Namespace) -> int:
         cfg.pop(args.key, None)
         save_config(cfg)
         print(f"unset {args.key}")
+        return 0
+    if args.action == "validate":
+        errors = validate_config(load_config(merged=False))
+        if errors:
+            for error in errors:
+                print(f"error\t{error}")
+            return 1
+        print(f"ok\t{config_path()}")
         return 0
     raise ValueError(f"unknown config action: {args.action}")
 
@@ -248,6 +437,8 @@ def cmd_doctor(_args: argparse.Namespace) -> int:
 
 
 def cmd_setup(args: argparse.Namespace) -> int:
+    if getattr(args, "wizard", False):
+        return cmd_wizard(args)
     script = Path(__file__).resolve().parent / "install.sh"
     cmd = [str(script)]
     if args.no_apt:
@@ -257,6 +448,106 @@ def cmd_setup(args: argparse.Namespace) -> int:
     return run_command(cmd, check=False)
 
 
+def cmd_summary(_args: argparse.Namespace) -> int:
+    cfg = load_config(merged=True)
+    print("WhisprFlow summary")
+    print(f"config\t{config_path()}")
+    print(f"provider\t{cfg.get('provider')}")
+    print(f"trigger\t{cfg.get('trigger')}")
+    print(f"button_device\t{cfg.get('button_device') or '(unset)'}")
+    print(f"mic_device\t{cfg.get('mic_device') or '(unset)'}")
+    print(f"model\t{os.environ.get('WHISPRFLOW_MODEL') or MODEL_DIR / MODEL_FILES['base']}")
+    print(f"paste_method\t{cfg.get('paste_method')}")
+    print("next\twhisprflowctl test button")
+    print("next\twhisprflowctl test mic")
+    print("next\twhisprflowctl calibrate")
+    return 0
+
+
+def cmd_test(args: argparse.Namespace) -> int:
+    cfg = load_config(merged=True)
+    sample_rate = int(cfg.get("sample_rate", 16000))
+    seconds = float(args.seconds)
+    if args.target == "button":
+        device = str(cfg.get("button_device") or "")
+        print(f"listening to button source: {device}")
+        print(f"press and release the button for {seconds:g}s")
+        samples = sample_parecord_levels(
+            device,
+            seconds,
+            sample_rate,
+            int(cfg.get("button_chunk_size", 1600)),
+        )
+        result = analyze_button_levels(samples)
+        print_analysis("button", result)
+        return 0 if result["verdict"] == "good" else 1
+    if args.target == "mic":
+        device = str(cfg.get("mic_device") or "")
+        print(f"listening to mic source: {device}")
+        print(f"say: testing testing 123 for {seconds:g}s")
+        samples = sample_parecord_levels(device, seconds, sample_rate, int(sample_rate * 0.1))
+        result = analyze_mic_levels(samples)
+        print_analysis("mic", result)
+        return 0 if result["verdict"] == "good" else 1
+    raise ValueError(f"unknown test target: {args.target}")
+
+
+def cmd_calibrate(args: argparse.Namespace) -> int:
+    cfg = load_config(merged=True)
+    sample_rate = int(cfg.get("sample_rate", 16000))
+    seconds = float(args.seconds)
+    print("button calibration")
+    button_samples = sample_parecord_levels(
+        str(cfg.get("button_device") or ""),
+        seconds,
+        sample_rate,
+        int(cfg.get("button_chunk_size", 1600)),
+    )
+    button = analyze_button_levels(button_samples)
+    print_analysis("button", button)
+    print("mic calibration")
+    mic_samples = sample_parecord_levels(
+        str(cfg.get("mic_device") or ""),
+        seconds,
+        sample_rate,
+        int(sample_rate * 0.1),
+    )
+    mic = analyze_mic_levels(mic_samples)
+    print_analysis("mic", mic)
+
+    recommendations = {}
+    recommendations.update(button["recommendations"])
+    recommendations.update(mic["recommendations"])
+    if not recommendations:
+        print("no config changes recommended")
+        return 1
+    if not args.apply:
+        print("run with --apply to save these values")
+        return 0
+    saved = load_config(merged=False)
+    saved.update(recommendations)
+    save_config(saved)
+    print(f"saved\t{config_path()}")
+    return run_command(["systemctl", "--user", "restart", SERVICE_NAME], check=False)
+
+
+def cmd_wizard(args: argparse.Namespace) -> int:
+    print("WhisprFlow guided setup")
+    doctor_code = cmd_doctor(args)
+    print()
+    cmd_summary(args)
+    print()
+    print("button test")
+    button_code = cmd_test(argparse.Namespace(target="button", seconds=args.seconds))
+    print()
+    print("mic test")
+    mic_code = cmd_test(argparse.Namespace(target="mic", seconds=args.seconds))
+    if args.apply:
+        print()
+        return cmd_calibrate(argparse.Namespace(seconds=args.seconds, apply=True))
+    return 1 if doctor_code or button_code or mic_code else 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Manage WhisprFlow")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -264,14 +555,21 @@ def build_parser() -> argparse.ArgumentParser:
     setup = sub.add_parser("setup", help="run installer")
     setup.add_argument("--no-apt", action="store_true")
     setup.add_argument("--start", action="store_true")
+    setup_sub = setup.add_subparsers(dest="setup_action")
+    wizard = setup_sub.add_parser("wizard", help="run guided setup")
+    wizard.add_argument("--seconds", type=float, default=6.0)
+    wizard.add_argument("--apply", action="store_true")
+    wizard.set_defaults(wizard=True)
     setup.set_defaults(func=cmd_setup)
 
     sub.add_parser("doctor", help="check install health").set_defaults(func=cmd_doctor)
     sub.add_parser("devices", help="list audio devices").set_defaults(func=cmd_devices)
+    sub.add_parser("summary", help="show current setup").set_defaults(func=cmd_summary)
 
     config = sub.add_parser("config", help="manage config")
     config_sub = config.add_subparsers(dest="action", required=True)
     config_sub.add_parser("show")
+    config_sub.add_parser("validate")
     get = config_sub.add_parser("get")
     get.add_argument("key")
     set_cmd = config_sub.add_parser("set")
@@ -291,6 +589,18 @@ def build_parser() -> argparse.ArgumentParser:
     logs.add_argument("-f", "--follow", action="store_true")
     logs.add_argument("-n", "--lines", type=int, default=80)
     logs.set_defaults(func=cmd_logs)
+
+    test = sub.add_parser("test", help="test audio button or mic")
+    test_sub = test.add_subparsers(dest="target", required=True)
+    for target in ("button", "mic"):
+        target_parser = test_sub.add_parser(target)
+        target_parser.add_argument("--seconds", type=float, default=6.0)
+    test.set_defaults(func=cmd_test)
+
+    calibrate = sub.add_parser("calibrate", help="measure and recommend audio thresholds")
+    calibrate.add_argument("--seconds", type=float, default=6.0)
+    calibrate.add_argument("--apply", action="store_true")
+    calibrate.set_defaults(func=cmd_calibrate)
 
     model = sub.add_parser("model", help="manage STT models")
     model_sub = model.add_subparsers(dest="action", required=True)
