@@ -277,7 +277,18 @@ def audio_levels(data: bytes) -> tuple[int, int]:
     return sum(abs_samples) // sample_count, max(abs_samples)
 
 
-def sample_parecord_levels(device: str, seconds: float, sample_rate: int, chunk_size: int = 1600) -> list[tuple[int, int]]:
+def format_level_meter(label: str, sample: tuple[int, int]) -> str:
+    avg, peak = sample
+    return f"{label} avg={avg} peak={peak}"
+
+
+def sample_parecord_levels(
+    device: str,
+    seconds: float,
+    sample_rate: int,
+    chunk_size: int = 1600,
+    meter_label: str | None = None,
+) -> list[tuple[int, int]]:
     if not device:
         raise ValueError("audio device is not configured")
     cmd = [
@@ -288,7 +299,12 @@ def sample_parecord_levels(device: str, seconds: float, sample_rate: int, chunk_
         "--raw",
         "--file-format=raw",
     ]
-    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+    proc = subprocess.Popen(
+        cmd,
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
     samples: list[tuple[int, int]] = []
     deadline = time.monotonic() + float(seconds)
     try:
@@ -297,7 +313,10 @@ def sample_parecord_levels(device: str, seconds: float, sample_rate: int, chunk_
             data = proc.stdout.read(max(1, int(chunk_size)) * 2)
             if not data:
                 break
-            samples.append(audio_levels(data))
+            sample = audio_levels(data)
+            samples.append(sample)
+            if meter_label:
+                print(format_level_meter(meter_label, sample), flush=True)
     finally:
         proc.terminate()
         try:
@@ -305,6 +324,10 @@ def sample_parecord_levels(device: str, seconds: float, sample_rate: int, chunk_
         except subprocess.TimeoutExpired:
             proc.kill()
             proc.wait(timeout=3)
+    if not samples and proc.stderr is not None:
+        error = proc.stderr.read().decode("utf-8", errors="replace").strip()
+        if error:
+            print(f"parecord error: {error}", file=sys.stderr)
     return samples
 
 
@@ -477,6 +500,7 @@ def cmd_test(args: argparse.Namespace) -> int:
             seconds,
             sample_rate,
             int(cfg.get("button_chunk_size", 1600)),
+            "button" if getattr(args, "meter", False) else None,
         )
         result = analyze_button_levels(samples)
         print_analysis("button", result)
@@ -485,7 +509,13 @@ def cmd_test(args: argparse.Namespace) -> int:
         device = str(cfg.get("mic_device") or "")
         print(f"listening to mic source: {device}")
         print(f"say: testing testing 123 for {seconds:g}s")
-        samples = sample_parecord_levels(device, seconds, sample_rate, int(sample_rate * 0.1))
+        samples = sample_parecord_levels(
+            device,
+            seconds,
+            sample_rate,
+            int(sample_rate * 0.1),
+            "mic" if getattr(args, "meter", False) else None,
+        )
         result = analyze_mic_levels(samples)
         print_analysis("mic", result)
         return 0 if result["verdict"] == "good" else 1
@@ -538,10 +568,15 @@ def cmd_wizard(args: argparse.Namespace) -> int:
     cmd_summary(args)
     print()
     print("button test")
-    button_code = cmd_test(argparse.Namespace(target="button", seconds=args.seconds))
+    prompt_enabled = not getattr(args, "no_prompt", False) and sys.stdin.isatty()
+    if prompt_enabled:
+        input("Press Enter, then click the button during the test window...")
+    button_code = cmd_test(argparse.Namespace(target="button", seconds=args.seconds, meter=True))
     print()
     print("mic test")
-    mic_code = cmd_test(argparse.Namespace(target="mic", seconds=args.seconds))
+    if prompt_enabled:
+        input("Press Enter, then say 'testing testing 123' during the test window...")
+    mic_code = cmd_test(argparse.Namespace(target="mic", seconds=args.seconds, meter=True))
     if args.apply:
         print()
         return cmd_calibrate(argparse.Namespace(seconds=args.seconds, apply=True))
@@ -559,6 +594,7 @@ def build_parser() -> argparse.ArgumentParser:
     wizard = setup_sub.add_parser("wizard", help="run guided setup")
     wizard.add_argument("--seconds", type=float, default=6.0)
     wizard.add_argument("--apply", action="store_true")
+    wizard.add_argument("--no-prompt", action="store_true")
     wizard.set_defaults(wizard=True)
     setup.set_defaults(func=cmd_setup)
 
@@ -595,6 +631,7 @@ def build_parser() -> argparse.ArgumentParser:
     for target in ("button", "mic"):
         target_parser = test_sub.add_parser(target)
         target_parser.add_argument("--seconds", type=float, default=6.0)
+        target_parser.add_argument("--meter", action="store_true")
     test.set_defaults(func=cmd_test)
 
     calibrate = sub.add_parser("calibrate", help="measure and recommend audio thresholds")

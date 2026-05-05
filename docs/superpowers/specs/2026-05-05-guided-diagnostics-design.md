@@ -8,10 +8,10 @@ Make `whisprflowctl` useful for a real setup session, not just raw config edits.
 
 - `whisprflowctl summary`: print the current setup in human terms: trigger, button source, mic source, service state, model state, paste path, and common next commands.
 - `whisprflowctl config validate`: check known config keys for type/value mistakes before restart.
-- `whisprflowctl test button [--seconds N]`: sample the configured button source, ask the user to press/release the button, report idle/active levels, verdict, and recommended thresholds.
-- `whisprflowctl test mic [--seconds N]`: sample the configured speech mic, ask the user to speak, report silence/speech levels, verdict, and recommended thresholds.
+- `whisprflowctl test button [--seconds N] [--meter]`: sample the configured button source, ask the user to press/release the button, optionally print live level lines, report idle/active levels, verdict, and recommended thresholds.
+- `whisprflowctl test mic [--seconds N] [--meter]`: sample the configured speech mic, ask the user to speak, optionally print live level lines, report silence/speech levels, verdict, and recommended thresholds.
 - `whisprflowctl calibrate [--apply]`: run button and mic tests together. Without `--apply`, print a config patch. With `--apply`, save recommendations and restart the service.
-- `whisprflowctl setup wizard`: conversational wrapper around `doctor`, `summary`, `test button`, `test mic`, optional apply, and service restart.
+- `whisprflowctl setup wizard [--no-prompt]`: conversational wrapper around `doctor`, `summary`, `test button`, `test mic`, optional apply, and service restart. In an interactive terminal it waits for Enter before button and mic phases.
 
 ## UX Rules
 
@@ -19,6 +19,7 @@ The CLI should avoid raw-only output. Every diagnostic command prints:
 
 - what it is listening to,
 - what the user should do now,
+- when the timed test starts,
 - measured level table,
 - verdict,
 - recommended config values,

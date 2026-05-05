@@ -97,6 +97,8 @@ whisprflowctl config set button_device alsa_input.example
 whisprflowctl config unset mic_device
 whisprflowctl test button
 whisprflowctl test mic
+whisprflowctl test button --meter
+whisprflowctl test mic --meter
 whisprflowctl calibrate
 whisprflowctl service restart
 whisprflowctl logs -n 120
@@ -111,7 +113,7 @@ Guided setup:
 whisprflowctl setup wizard
 ```
 
-This checks the install, shows current config, asks you to press the audio button, asks you to speak into the mic, then prints measured levels and recommended thresholds.
+This checks the install, shows current config, waits for Enter before each phase, asks you to press the audio button, asks you to speak into the mic, then prints measured levels and recommended thresholds. Use `--no-prompt` for scripts.
 
 To write recommended thresholds and restart the service:
 

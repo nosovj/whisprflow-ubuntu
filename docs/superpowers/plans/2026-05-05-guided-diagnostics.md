@@ -50,6 +50,14 @@ Add `sample_parecord_levels(device, seconds, sample_rate, chunk_size)` that retu
 
 Add human-readable output for `summary`, `test`, `calibrate`, and wizard. `calibrate --apply` saves recommendations and restarts the service.
 
+- [x] **Step 4: Gate wizard phases**
+
+Add Enter prompts before button and mic phases when stdin is interactive, plus `--no-prompt` for scripts.
+
+- [x] **Step 5: Add level meter output**
+
+Add `--meter` to `test button` and `test mic`, and enable it from the wizard so users see live level lines during timed capture.
+
 ### Task 3: Docs, Verification, Release
 
 **Files:**

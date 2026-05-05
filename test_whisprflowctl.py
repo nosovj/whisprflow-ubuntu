@@ -181,6 +181,76 @@ class CommandCliTests(unittest.TestCase):
         self.assertTrue(save.called)
         run.assert_called_once_with(["systemctl", "--user", "restart", "whisprflow.service"], check=False)
 
+    def test_wizard_prompts_before_button_and_mic_when_interactive(self):
+        cfg = {
+            "button_device": "button",
+            "mic_device": "mic",
+            "sample_rate": 16000,
+            "button_chunk_size": 1600,
+        }
+        samples = [[(100, 200), (4000, 9000)], [(40, 100), (900, 7000)]]
+
+        with mock.patch("whisprflowctl.cmd_doctor", return_value=0):
+            with mock.patch("whisprflowctl.cmd_summary", return_value=0):
+                with mock.patch("whisprflowctl.load_config", return_value=cfg):
+                    with mock.patch("whisprflowctl.sample_parecord_levels", side_effect=samples):
+                        with mock.patch("sys.stdin.isatty", return_value=True):
+                            with mock.patch("builtins.input", return_value="") as prompt:
+                                code = whisprflowctl.main(["setup", "wizard", "--seconds", "1"])
+
+        self.assertEqual(code, 0)
+        self.assertEqual(prompt.call_count, 2)
+
+    def test_wizard_no_prompt_skips_enter_prompts(self):
+        cfg = {
+            "button_device": "button",
+            "mic_device": "mic",
+            "sample_rate": 16000,
+            "button_chunk_size": 1600,
+        }
+        samples = [[(100, 200), (4000, 9000)], [(40, 100), (900, 7000)]]
+
+        with mock.patch("whisprflowctl.cmd_doctor", return_value=0):
+            with mock.patch("whisprflowctl.cmd_summary", return_value=0):
+                with mock.patch("whisprflowctl.load_config", return_value=cfg):
+                    with mock.patch("whisprflowctl.sample_parecord_levels", side_effect=samples):
+                        with mock.patch("builtins.input") as prompt:
+                            code = whisprflowctl.main(["setup", "wizard", "--seconds", "1", "--no-prompt"])
+
+        self.assertEqual(code, 0)
+        prompt.assert_not_called()
+
+    def test_level_meter_formats_last_sample(self):
+        self.assertEqual(whisprflowctl.format_level_meter("button", (123, 456)), "button avg=123 peak=456")
+
+    def test_sampling_detaches_parecord_from_prompt_stdin(self):
+        class FakeStdout:
+            def __init__(self):
+                self.calls = 0
+
+            def read(self, _size):
+                self.calls += 1
+                if self.calls == 1:
+                    return b"\x01\x00\x02\x00"
+                return b""
+
+        class FakeProcess:
+            def __init__(self):
+                self.stdout = FakeStdout()
+                self.stderr = FakeStdout()
+
+            def terminate(self):
+                pass
+
+            def wait(self, timeout=None):
+                return 0
+
+        with mock.patch("whisprflowctl.subprocess.Popen", return_value=FakeProcess()) as popen:
+            samples = whisprflowctl.sample_parecord_levels("device", 1, 16000)
+
+        self.assertEqual(samples, [(1, 2)])
+        self.assertIs(popen.call_args.kwargs["stdin"], whisprflowctl.subprocess.DEVNULL)
+
 
 if __name__ == "__main__":
     unittest.main()
