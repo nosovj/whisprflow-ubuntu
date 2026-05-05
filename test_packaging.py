@@ -14,6 +14,8 @@ class PackagingTests(unittest.TestCase):
         self.assertIn("huggingface.co/ggerganov/whisper.cpp", install)
         self.assertIn("nvm install", install)
         self.assertIn("package.json", install)
+        self.assertIn("OPENWHISPR_REF", install)
+        self.assertIn("git -C \"$OPENWHISPR_ROOT\" checkout", install)
         self.assertNotIn("does not install OpenWhispr", install)
 
     def test_readme_documents_openwhispr_install_and_tested_ubuntu_version(self):
@@ -22,6 +24,14 @@ class PackagingTests(unittest.TestCase):
         self.assertIn("./install.sh --no-openwhispr", readme)
         self.assertIn("Ubuntu 22.04.5 LTS", readme)
         self.assertIn("downloads the default STT model", readme)
+        self.assertIn("OPENWHISPR_REF", readme)
+
+    def test_ci_runs_unit_shell_and_secret_checks(self):
+        workflow = (ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+
+        self.assertIn("python -m unittest", workflow)
+        self.assertIn("bash -n", workflow)
+        self.assertIn("grep", workflow)
 
 
 if __name__ == "__main__":

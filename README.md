@@ -25,6 +25,7 @@ The installer:
 - installs Ubuntu apt packages for audio, venvs, X11 typing, and clipboard fallback
 - adds `wtype` on Wayland when available
 - clones or updates OpenWhispr in `~/openwhispr`
+- checks out pinned OpenWhispr ref `dac4a1ba` by default
 - installs the Node.js major version required by OpenWhispr when `nvm` is available
 - downloads OpenWhispr whisper.cpp server binaries with `npm run download:whisper-cpp`
 - downloads the default STT model to `~/.cache/openwhispr/whisper-models/ggml-base.bin`
@@ -38,6 +39,12 @@ To skip OpenWhispr/model installation:
 
 ```bash
 ./install.sh --no-openwhispr
+```
+
+To use a different OpenWhispr ref:
+
+```bash
+OPENWHISPR_REF=main ./install.sh
 ```
 
 Local transcription uses the OpenWhispr/whisper.cpp-compatible server. `run.sh` expects:

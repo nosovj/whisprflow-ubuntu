@@ -10,6 +10,7 @@ SYSTEMD_DIR="$CONFIG_HOME/systemd/user"
 AUTOSTART_DIR="$CONFIG_HOME/autostart"
 OPENWHISPR_ROOT="${OPENWHISPR_ROOT:-$HOME/openwhispr}"
 OPENWHISPR_REPO="${OPENWHISPR_REPO:-https://github.com/OpenWhispr/openwhispr.git}"
+OPENWHISPR_REF="${OPENWHISPR_REF:-dac4a1ba}"
 MODEL_NAME="${WHISPRFLOW_MODEL_NAME:-base}"
 MODEL_DIR="${WHISPRFLOW_MODEL_DIR:-$HOME/.cache/openwhispr/whisper-models}"
 
@@ -39,6 +40,7 @@ Options:
   --no-service             skip systemd/autostart installation
   --start                  restart whisprflow.service after install
   --openwhispr-root=PATH   OpenWhispr checkout path (default: ~/openwhispr)
+  OPENWHISPR_REF=REF       OpenWhispr git ref to install (default: dac4a1ba)
   --model=NAME             STT model: base or large-v3-turbo
 EOF
       exit 0
@@ -129,13 +131,14 @@ require_node_for_openwhispr() {
 
 install_openwhispr() {
   if [[ -d "$OPENWHISPR_ROOT/.git" ]]; then
-    git -C "$OPENWHISPR_ROOT" pull --ff-only
+    git -C "$OPENWHISPR_ROOT" fetch --tags origin
   elif [[ -e "$OPENWHISPR_ROOT" ]]; then
     echo "OpenWhispr root exists but is not a git checkout: $OPENWHISPR_ROOT" >&2
     return 1
   else
     git clone "$OPENWHISPR_REPO" "$OPENWHISPR_ROOT"
   fi
+  git -C "$OPENWHISPR_ROOT" checkout "$OPENWHISPR_REF"
   require_node_for_openwhispr
   npm --prefix "$OPENWHISPR_ROOT" install
   npm --prefix "$OPENWHISPR_ROOT" run download:whisper-cpp

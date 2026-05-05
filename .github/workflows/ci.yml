@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Install system dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y portaudio19-dev
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+
+      - name: Unit tests
+        run: python -m unittest test_whisprflow.py test_packaging.py
+
+      - name: Python syntax
+        run: python -c "import ast; ast.parse(open('whisprflow.py').read()); ast.parse(open('hud.py').read())"
+
+      - name: Shell syntax
+        run: bash -n run.sh autostart.sh install.sh scripts/list-audio-devices.sh
+
+      - name: Secret pattern scan
+        run: |
+          ! git grep -n -I -E "sk-[A-Za-z0-9_-]{20,}|gho_[A-Za-z0-9_]+|ghp_[A-Za-z0-9_]+|github_pat_[A-Za-z0-9_]+|OPENAI_API_KEY=|Authorization: Bearer [A-Za-z0-9._-]+|api[_-]?key[[:space:]]*[:=][[:space:]]*['\"][^'\"]+|token[[:space:]]*[:=][[:space:]]*['\"][^'\"]+|secret[[:space:]]*[:=][[:space:]]*['\"][^'\"]+" -- . ":(exclude).github/workflows/ci.yml"
