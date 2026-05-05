@@ -17,7 +17,7 @@ jobs:
       - name: Install system dependencies
         run: |
           sudo apt update
-          sudo apt install -y portaudio19-dev
+          sudo apt install -y portaudio19-dev xvfb
 
       - name: Install Python dependencies
         run: |
@@ -25,7 +25,7 @@ jobs:
           python -m pip install -r requirements.txt
 
       - name: Unit tests
-        run: python -m unittest test_whisprflow.py test_packaging.py
+        run: timeout 60s xvfb-run -a python -m unittest test_whisprflow.py test_packaging.py
 
       - name: Python syntax
         run: python -c "import ast; ast.parse(open('whisprflow.py').read()); ast.parse(open('hud.py').read())"
