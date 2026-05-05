@@ -25,10 +25,10 @@ jobs:
           python -m pip install -r requirements.txt
 
       - name: Unit tests
-        run: timeout 60s xvfb-run -a python -m unittest test_whisprflow.py test_packaging.py
+        run: timeout 60s xvfb-run -a python -m unittest test_whisprflow.py test_packaging.py test_whisprflowctl.py
 
       - name: Python syntax
-        run: python -c "import ast; ast.parse(open('whisprflow.py').read()); ast.parse(open('hud.py').read())"
+        run: python -c "import ast; ast.parse(open('whisprflow.py').read()); ast.parse(open('hud.py').read()); ast.parse(open('whisprflowctl.py').read())"
 
       - name: Shell syntax
         run: bash -n run.sh autostart.sh install.sh scripts/list-audio-devices.sh

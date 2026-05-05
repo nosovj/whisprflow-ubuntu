@@ -8,6 +8,7 @@ CONFIG_FILE="$CONFIG_DIR/config.json"
 LEGACY_CONFIG_FILE="$CONFIG_HOME/whisprtalk/config.json"
 SYSTEMD_DIR="$CONFIG_HOME/systemd/user"
 AUTOSTART_DIR="$CONFIG_HOME/autostart"
+BIN_DIR="$HOME/.local/bin"
 OPENWHISPR_ROOT="${OPENWHISPR_ROOT:-$HOME/openwhispr}"
 OPENWHISPR_REPO="${OPENWHISPR_REPO:-https://github.com/OpenWhispr/openwhispr.git}"
 OPENWHISPR_REF="${OPENWHISPR_REF:-dac4a1ba}"
@@ -167,6 +168,9 @@ python3 -m venv "$ROOT/.venv"
 "$ROOT/.venv/bin/python" -m pip install --upgrade pip
 "$ROOT/.venv/bin/python" -m pip install -r "$ROOT/requirements.txt"
 
+mkdir -p "$BIN_DIR"
+ln -sf "$ROOT/whisprflowctl.py" "$BIN_DIR/whisprflowctl"
+
 mkdir -p "$CONFIG_DIR"
 if [[ ! -f "$CONFIG_FILE" ]]; then
   if [[ -f "$LEGACY_CONFIG_FILE" ]]; then
@@ -209,6 +213,7 @@ fi
 echo
 echo "Installed WhisprFlow files in: $ROOT"
 echo "Config: $CONFIG_FILE"
+echo "CLI: $BIN_DIR/whisprflowctl"
 if [[ "$INSTALL_SERVICE" == "1" ]]; then
   echo "Service: systemctl --user status whisprflow.service"
 fi

@@ -31,6 +31,7 @@ The installer:
 - downloads the default STT model to `~/.cache/openwhispr/whisper-models/ggml-base.bin`
 - creates `.venv`
 - installs Python deps from `requirements.txt`
+- installs `whisprflowctl` into `~/.local/bin`
 - creates `~/.config/whisprflow/config.json`
 - installs `~/.config/systemd/user/whisprflow.service`
 - installs `~/.config/autostart/whisprflow.desktop`
@@ -81,7 +82,22 @@ Press the macropad button once. The key is saved to:
 To find PulseAudio/PipeWire source names for `button_device` and `mic_device`:
 
 ```bash
-~/whisprflow-ubuntu/scripts/list-audio-devices.sh
+whisprflowctl devices
+```
+
+Useful CLI commands:
+
+```bash
+whisprflowctl doctor
+whisprflowctl config show
+whisprflowctl config set trigger audio_button
+whisprflowctl config set button_device alsa_input.example
+whisprflowctl config unset mic_device
+whisprflowctl service restart
+whisprflowctl logs -n 120
+whisprflowctl model list
+whisprflowctl model install large-v3-turbo
+whisprflowctl openwhispr pin dac4a1ba
 ```
 
 ## Run
