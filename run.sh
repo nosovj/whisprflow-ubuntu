@@ -3,7 +3,14 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 OPENWHISPR_ROOT="$HOME/openwhispr"
-SERVER="$OPENWHISPR_ROOT/dist/linux-unpacked/resources/bin/whisper-server-linux-x64"
+SERVER="${WHISPRFLOW_SERVER:-}"
+if [[ -z "$SERVER" ]]; then
+  if [[ -x "$OPENWHISPR_ROOT/dist/linux-unpacked/resources/bin/whisper-server-linux-x64" ]]; then
+    SERVER="$OPENWHISPR_ROOT/dist/linux-unpacked/resources/bin/whisper-server-linux-x64"
+  else
+    SERVER="$OPENWHISPR_ROOT/resources/bin/whisper-server-linux-x64"
+  fi
+fi
 MODEL="${WHISPRFLOW_MODEL:-${WHISPRTALK_MODEL:-$HOME/.cache/openwhispr/whisper-models/ggml-base.bin}}"
 PORT="8180"
 LOG="$ROOT/whisper-server.log"

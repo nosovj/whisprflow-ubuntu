@@ -6,6 +6,8 @@ Released under the Unlicense. Use it for anything.
 
 ## Install
 
+Requires Python 3.10+, Git, curl, and Node.js/npm for OpenWhispr. The installer reads OpenWhispr's `package.json` and uses `nvm` when available to install the required Node major version. Current OpenWhispr requires Node.js 24+.
+
 ```bash
 git clone https://github.com/nosovj/whisprflow-ubuntu.git ~/whisprflow-ubuntu
 cd ~/whisprflow-ubuntu
@@ -22,13 +24,23 @@ The installer:
 
 - installs Ubuntu apt packages for audio, venvs, X11 typing, and clipboard fallback
 - adds `wtype` on Wayland when available
+- clones or updates OpenWhispr in `~/openwhispr`
+- installs the Node.js major version required by OpenWhispr when `nvm` is available
+- downloads OpenWhispr whisper.cpp server binaries with `npm run download:whisper-cpp`
+- downloads the default STT model to `~/.cache/openwhispr/whisper-models/ggml-base.bin`
 - creates `.venv`
 - installs Python deps from `requirements.txt`
 - creates `~/.config/whisprflow/config.json`
 - installs `~/.config/systemd/user/whisprflow.service`
 - installs `~/.config/autostart/whisprflow.desktop`
 
-Local transcription uses an existing OpenWhispr/whisper.cpp-compatible server. This repo does not install OpenWhispr or download speech-to-text models yet. `run.sh` expects:
+To skip OpenWhispr/model installation:
+
+```bash
+./install.sh --no-openwhispr
+```
+
+Local transcription uses the OpenWhispr/whisper.cpp-compatible server. `run.sh` expects:
 
 ```text
 ~/openwhispr/dist/linux-unpacked/resources/bin/whisper-server-linux-x64
@@ -39,6 +51,12 @@ Override the model path with:
 
 ```bash
 WHISPRFLOW_MODEL=/path/to/ggml-model.bin ~/whisprflow-ubuntu/run.sh
+```
+
+To install the larger turbo model instead of the default base model:
+
+```bash
+./install.sh --model=large-v3-turbo
 ```
 
 ## Configure Key
@@ -144,6 +162,7 @@ On X11, `auto` prefers `xdotool`, then clipboard. On Wayland, `auto` prefers `wt
 
 This repo was built against one Ubuntu desktop setup:
 
+- OS: Ubuntu 22.04.5 LTS (`jammy`), kernel `6.8.0-110-generic`
 - Speech mic hardware: [Samson G-Track Pro USB condenser microphone/audio interface](https://www.amazon.com/dp/B075KL6ZLC)
 - PTT switch hardware: generic momentary push button wired into an audio input. The tested setup repurposed the button from a [dual-monitor DisplayPort KVM switch](https://www.amazon.com/dp/B0DG4S4L5D).
 - Audio-jack push button source: `alsa_input.pci-0000_00_1f.3.analog-stereo`
@@ -152,7 +171,8 @@ This repo was built against one Ubuntu desktop setup:
 - Paste path: X11 `xdotool`
 - Transcription: local OpenWhispr whisper.cpp-compatible server at `http://127.0.0.1:8180/inference`
 - GPU on tested machine: NVIDIA RTX 5090
-- STT model used by `run.sh`: `$HOME/.cache/openwhispr/whisper-models/ggml-base.bin`
+- STT models present: `ggml-base.bin`, `ggml-large-v3-turbo.bin`
+- STT model used by default `run.sh`: `$HOME/.cache/openwhispr/whisper-models/ggml-base.bin`
 
 Working config from that machine:
 
