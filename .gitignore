@@ -1,0 +1,12 @@
+.venv/
+__pycache__/
+*.py[cod]
+
+*.log
+*.pid
+status.txt
+hud.txt
+last_failed.wav
+
+.env
+run.local.sh
