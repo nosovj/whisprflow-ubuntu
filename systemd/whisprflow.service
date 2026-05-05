@@ -1,0 +1,13 @@
+[Unit]
+Description=WhisprFlow push-to-talk dictation
+After=graphical-session.target
+
+[Service]
+Type=simple
+WorkingDirectory=__ROOT__
+ExecStart=__ROOT__/run.sh
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=default.target

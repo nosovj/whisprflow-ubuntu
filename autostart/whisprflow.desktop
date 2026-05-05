@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=WhisprFlow
+Comment=Import desktop environment and start WhisprFlow dictation
+Exec=__ROOT__/autostart.sh
+Terminal=false
+X-GNOME-Autostart-enabled=true

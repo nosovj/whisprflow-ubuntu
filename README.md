@@ -2,25 +2,31 @@
 
 Unofficial WhisprFlow-style dictation for Ubuntu/Linux. Hold the audio-jack button to record, pause after speaking, then transcribe through local OpenWhispr and type into the focused window.
 
+Released under the Unlicense. Use it for anything.
+
 ## Install
 
 ```bash
-sudo apt update
-sudo apt install -y python3-venv portaudio19-dev xdotool wl-clipboard xclip
-
 git clone https://github.com/nosovj/whisprflow-ubuntu.git ~/whisprflow-ubuntu
 cd ~/whisprflow-ubuntu
-python3 -m venv .venv
-source .venv/bin/activate
-pip install --upgrade pip
-pip install sounddevice numpy pynput requests
+./install.sh
 ```
 
-Wayland users should also install `wtype` when available:
+To install deps and immediately start the user service:
 
 ```bash
-sudo apt install -y wtype
+./install.sh --start
 ```
+
+The installer:
+
+- installs Ubuntu apt packages for audio, venvs, X11 typing, and clipboard fallback
+- adds `wtype` on Wayland when available
+- creates `.venv`
+- installs Python deps from `requirements.txt`
+- creates `~/.config/whisprflow/config.json`
+- installs `~/.config/systemd/user/whisprflow.service`
+- installs `~/.config/autostart/whisprflow.desktop`
 
 Local transcription uses an existing OpenWhispr/whisper.cpp-compatible server. This repo does not install OpenWhispr or download speech-to-text models yet. `run.sh` expects:
 
@@ -45,6 +51,12 @@ Press the macropad button once. The key is saved to:
 
 ```text
 ~/.config/whisprflow/config.json
+```
+
+To find PulseAudio/PipeWire source names for `button_device` and `mic_device`:
+
+```bash
+~/whisprflow-ubuntu/scripts/list-audio-devices.sh
 ```
 
 ## Run
@@ -205,6 +217,13 @@ To re-enable manually:
 ```bash
 systemctl --user daemon-reload
 systemctl --user enable --now whisprflow.service
+```
+
+To disable autostart:
+
+```bash
+systemctl --user disable --now whisprflow.service
+rm -f ~/.config/autostart/whisprflow.desktop
 ```
 
 ## Troubleshooting

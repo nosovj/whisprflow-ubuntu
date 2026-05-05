@@ -1,0 +1,4 @@
+numpy
+pynput
+requests
+sounddevice
