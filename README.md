@@ -118,6 +118,8 @@ On X11, `auto` prefers `xdotool`, then clipboard. On Wayland, `auto` prefers `wt
 
 This repo was built against one Ubuntu desktop setup:
 
+- Speech mic hardware: [Samson G-Track Pro USB condenser microphone/audio interface](https://www.amazon.com/dp/B075KL6ZLC)
+- PTT switch hardware: button from [dual-monitor DisplayPort KVM switch](https://www.amazon.com/dp/B0DG4S4L5D)
 - Audio-jack push button source: `alsa_input.pci-0000_00_1f.3.analog-stereo`
 - Button source port: `analog-input-rear-mic`
 - Speech mic: `alsa_input.usb-Samson_Technologies_Samson_G-Track_Pro_A7F52D1227153B00-00.analog-stereo`
