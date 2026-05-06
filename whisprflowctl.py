@@ -63,7 +63,6 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "mic_silence_stop_sec": 1.0,
     "mic_no_speech_stop_sec": 4.0,
     "mic_min_mean_abs": 220,
-    "max_recording_sec": 15.0,
     "streaming_phrases": True,
     "phrase_preroll_sec": 0.4,
     "phrase_silence_sec": 0.7,

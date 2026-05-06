@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.3.6
+
+- Removed `max_recording_sec` from defaults, example config, docs, and runtime.
+- Streaming dictation now continues while the button remains active and stops on button release or speech/silence logic.
+
 ## v0.3.4
 
 - Added clearer source-test diagnostics when the configured button input stays flat.

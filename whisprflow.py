@@ -59,7 +59,6 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "mic_silence_stop_sec": 1.0,
     "mic_no_speech_stop_sec": 4.0,
     "mic_min_mean_abs": 220,
-    "max_recording_sec": 15.0,
     "streaming_phrases": True,
     "phrase_preroll_sec": 0.4,
     "phrase_silence_sec": 0.7,
@@ -1011,7 +1010,6 @@ class PhraseStreamingSession:
             self.process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
             assert self.process.stdout is not None
             chunk_bytes = max(1600, int(self.sample_rate * self.channels * 2 * 0.1))
-            max_recording_sec = float(self.cfg.get("max_recording_sec", 15.0))
             while not self.stop_event.is_set():
                 data = self.process.stdout.read(chunk_bytes)
                 if not data:
@@ -1020,9 +1018,6 @@ class PhraseStreamingSession:
                 for phrase in segmenter.accept(audio):
                     self._enqueue_phrase(phrase)
                 if segmenter.should_stop():
-                    break
-                if time.monotonic() - self.started_at >= max_recording_sec:
-                    print("max recording duration reached; stopping", flush=True)
                     break
 
             final_phrase = segmenter.flush()
@@ -1534,11 +1529,6 @@ class WhisprFlow:
                 ):
                     self.on_audio_button_release()
                     continue
-                if self.active_clip and self.recording_started_at:
-                    if time.monotonic() - self.recording_started_at >= float(self.cfg.get("max_recording_sec", 15.0)):
-                        print("max recording duration reached; stopping", flush=True)
-                        self.on_audio_button_release()
-                        continue
                 avg, peak = audio_levels(data)
                 if self.cfg.get("button_debug"):
                     print(f"button avg={avg} peak={peak}", flush=True)

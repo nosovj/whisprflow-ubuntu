@@ -183,7 +183,6 @@ Default config:
   "mic_speech_peak_min_average": 150,
   "mic_no_speech_stop_sec": 4.0,
   "mic_min_mean_abs": 220,
-  "max_recording_sec": 15.0,
   "streaming_phrases": true,
   "phrase_preroll_sec": 0.4,
   "phrase_silence_sec": 0.7,

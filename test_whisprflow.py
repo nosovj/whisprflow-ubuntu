@@ -77,6 +77,9 @@ class LocalOpenWhisprTests(unittest.TestCase):
 
 
 class AudioButtonTests(unittest.TestCase):
+    def test_default_config_has_no_recording_duration_cap(self):
+        self.assertNotIn("max_recording_sec", whisprflow.DEFAULT_CONFIG)
+
     def test_average_amplitude_reads_int16_samples(self):
         data = struct.pack("<4h", -100, 200, -300, 400)
 

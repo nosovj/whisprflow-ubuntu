@@ -44,6 +44,12 @@ class PackagingTests(unittest.TestCase):
         for version in ("v0.3.0", "v0.3.1", "v0.3.2", "v0.3.3", "v0.3.4"):
             self.assertIn(version, changelog)
 
+    def test_recording_duration_cap_is_not_documented_or_configured(self):
+        for path in ("README.md", "config.example.json", "whisprflowctl.py"):
+            content = (ROOT / path).read_text(encoding="utf-8")
+            self.assertNotIn("max_recording_sec", content)
+            self.assertNotIn("max recording duration", content)
+
     def test_ci_runs_unit_shell_and_secret_checks(self):
         workflow = (ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
 
