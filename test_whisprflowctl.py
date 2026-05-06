@@ -4,6 +4,7 @@ import tempfile
 import unittest
 from pathlib import Path
 from unittest import mock
+from io import StringIO
 
 import whisprflowctl
 
@@ -201,6 +202,22 @@ class CommandCliTests(unittest.TestCase):
                         code = whisprflowctl.main(["test", "sources", "--seconds", "1"])
 
         self.assertEqual(code, 1)
+
+    def test_test_sources_explains_flat_configured_source(self):
+        samples = {
+            "configured": [(200, 740), (205, 760)],
+            "mic": [(60, 200), (180, 2500)],
+        }
+
+        with mock.patch("whisprflowctl.load_config", return_value={"button_device": "configured", "sample_rate": 16000}):
+            with mock.patch("whisprflowctl.apply_button_audio_settings", return_value=None):
+                with mock.patch("whisprflowctl.list_pulse_sources", return_value=["configured", "mic"]):
+                    with mock.patch("whisprflowctl.sample_many_parecord_levels", return_value=samples):
+                        with mock.patch("sys.stdout", new_callable=StringIO) as stdout:
+                            code = whisprflowctl.main(["test", "sources", "--seconds", "1"])
+
+        self.assertEqual(code, 1)
+        self.assertIn("diagnosis\tconfigured button source stayed flat", stdout.getvalue())
 
     def test_apply_button_audio_settings_matches_runtime_tuning(self):
         cfg = {"button_device": "alsa_input.example"}

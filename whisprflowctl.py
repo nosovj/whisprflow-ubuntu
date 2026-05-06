@@ -648,11 +648,17 @@ def cmd_test(args: argparse.Namespace) -> int:
             )
         if ranked:
             best = ranked[0]
+            configured = next((item for item in ranked if item["source"] == cfg.get("button_device")), None)
             print(f"best_source\t{best['source']}")
             if best["source"] != cfg.get("button_device") and best["verdict"] == "good":
                 print(f"set_command\twhisprflowctl config set button_device {best['source']}")
             if best["verdict"] != "good":
                 print("no source showed a clear button spike")
+                if configured and configured["verdict"] == "button not detected":
+                    print("diagnosis\tconfigured button source stayed flat")
+                    if best["source"] != configured["source"] and best["score"] > configured["score"]:
+                        print("diagnosis\tbest movement was on another mic, likely acoustic noise instead of the electrical button")
+                    print("next\tcheck the button cable, jack, adapter wiring, and selected input port")
                 return 1
             return 0
         return 1
