@@ -2,11 +2,20 @@ import json
 import os
 import tempfile
 import unittest
+from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 from unittest import mock
 from io import StringIO
 
 import whisprflowctl
+
+
+def run_cli(args):
+    stdout = StringIO()
+    stderr = StringIO()
+    with redirect_stdout(stdout), redirect_stderr(stderr):
+        code = whisprflowctl.main(args)
+    return code, stdout.getvalue(), stderr.getvalue()
 
 
 class ConfigCliTests(unittest.TestCase):
@@ -26,40 +35,40 @@ class ConfigCliTests(unittest.TestCase):
         return json.loads((Path(self.tmp.name) / "whisprflow" / "config.json").read_text(encoding="utf-8"))
 
     def test_config_set_writes_json_value(self):
-        code = whisprflowctl.main(["config", "set", "streaming_phrases", "false"])
+        code, _, _ = run_cli(["config", "set", "streaming_phrases", "false"])
 
         self.assertEqual(code, 0)
         self.assertFalse(self.read_config()["streaming_phrases"])
 
     def test_config_set_writes_string_value(self):
-        code = whisprflowctl.main(["config", "set", "mic_device", "alsa_input.example"])
+        code, _, _ = run_cli(["config", "set", "mic_device", "alsa_input.example"])
 
         self.assertEqual(code, 0)
         self.assertEqual(self.read_config()["mic_device"], "alsa_input.example")
 
     def test_config_unset_removes_override(self):
-        whisprflowctl.main(["config", "set", "mic_device", "alsa_input.example"])
+        run_cli(["config", "set", "mic_device", "alsa_input.example"])
 
-        code = whisprflowctl.main(["config", "unset", "mic_device"])
+        code, _, _ = run_cli(["config", "unset", "mic_device"])
 
         self.assertEqual(code, 0)
         self.assertNotIn("mic_device", self.read_config())
 
     def test_config_set_rejects_wrong_known_type(self):
-        code = whisprflowctl.main(["config", "set", "mic_min_mean_abs", "not-a-number"])
+        code, _, _ = run_cli(["config", "set", "mic_min_mean_abs", "not-a-number"])
 
         self.assertEqual(code, 2)
         self.assertFalse((Path(self.tmp.name) / "whisprflow" / "config.json").exists())
 
     def test_config_validate_accepts_current_defaults(self):
-        code = whisprflowctl.main(["config", "validate"])
+        code, _, _ = run_cli(["config", "validate"])
 
         self.assertEqual(code, 0)
 
     def test_config_validate_rejects_bad_existing_value(self):
         whisprflowctl.save_config({"mic_min_mean_abs": "not-a-number"})
 
-        code = whisprflowctl.main(["config", "validate"])
+        code, _, _ = run_cli(["config", "validate"])
 
         self.assertEqual(code, 1)
 
@@ -120,21 +129,21 @@ class AnalysisTests(unittest.TestCase):
 class CommandCliTests(unittest.TestCase):
     def test_service_restart_runs_systemctl_user(self):
         with mock.patch("whisprflowctl.run_command", return_value=0) as run:
-            code = whisprflowctl.main(["service", "restart"])
+            code, _, _ = run_cli(["service", "restart"])
 
         self.assertEqual(code, 0)
         run.assert_called_once_with(["systemctl", "--user", "restart", "whisprflow.service"], check=False)
 
     def test_model_install_uses_known_model_url(self):
         with mock.patch("whisprflowctl.download_model", return_value=0) as download:
-            code = whisprflowctl.main(["model", "install", "large-v3-turbo"])
+            code, _, _ = run_cli(["model", "install", "large-v3-turbo"])
 
         self.assertEqual(code, 0)
         download.assert_called_once_with("large-v3-turbo")
 
     def test_openwhispr_pin_sets_ref(self):
         with mock.patch("whisprflowctl.run_command", return_value=0) as run:
-            code = whisprflowctl.main(["openwhispr", "pin", "abc123"])
+            code, _, _ = run_cli(["openwhispr", "pin", "abc123"])
 
         self.assertEqual(code, 0)
         run.assert_any_call(["git", "-C", str(Path.home() / "openwhispr"), "fetch", "--tags", "origin"])
@@ -144,7 +153,7 @@ class CommandCliTests(unittest.TestCase):
         with mock.patch("whisprflowctl.shutil.which", return_value="/usr/bin/fake"):
             with mock.patch("whisprflowctl.Path.exists", return_value=True):
                 with mock.patch("whisprflowctl.load_config", return_value={"button_device": "button", "mic_device": "mic"}):
-                    code = whisprflowctl.main(["doctor"])
+                    code, _, _ = run_cli(["doctor"])
 
         self.assertEqual(code, 0)
 
@@ -156,7 +165,7 @@ class CommandCliTests(unittest.TestCase):
 
     def test_summary_command_loads_current_config(self):
         with mock.patch("whisprflowctl.load_config", return_value=whisprflowctl.DEFAULT_CONFIG.copy()):
-            code = whisprflowctl.main(["summary"])
+            code, _, _ = run_cli(["summary"])
 
         self.assertEqual(code, 0)
 
@@ -164,7 +173,7 @@ class CommandCliTests(unittest.TestCase):
         with mock.patch("whisprflowctl.load_config", return_value={"button_device": "button", "sample_rate": 16000}):
             with mock.patch("whisprflowctl.sample_parecord_levels", return_value=[(100, 200), (4000, 9000)]):
                 with mock.patch("whisprflowctl.apply_button_audio_settings", return_value=None):
-                    code = whisprflowctl.main(["test", "button", "--seconds", "1"])
+                    code, _, _ = run_cli(["test", "button", "--seconds", "1"])
 
         self.assertEqual(code, 0)
 
@@ -172,7 +181,7 @@ class CommandCliTests(unittest.TestCase):
         with mock.patch("whisprflowctl.load_config", return_value={"button_device": "button", "sample_rate": 16000}):
             with mock.patch("whisprflowctl.sample_parecord_levels", return_value=[(100, 200), (110, 210)]):
                 with mock.patch("whisprflowctl.apply_button_audio_settings", return_value=None):
-                    code = whisprflowctl.main(["test", "button", "--seconds", "1"])
+                    code, _, _ = run_cli(["test", "button", "--seconds", "1"])
 
         self.assertEqual(code, 1)
 
@@ -183,9 +192,10 @@ class CommandCliTests(unittest.TestCase):
         }
 
         with mock.patch("whisprflowctl.load_config", return_value={"button_device": "flat", "sample_rate": 16000}):
-            with mock.patch("whisprflowctl.list_pulse_sources", return_value=["flat", "button"]):
-                with mock.patch("whisprflowctl.sample_many_parecord_levels", return_value=samples):
-                    code = whisprflowctl.main(["test", "sources", "--seconds", "1"])
+            with mock.patch("whisprflowctl.apply_button_audio_settings", return_value=None):
+                with mock.patch("whisprflowctl.list_pulse_sources", return_value=["flat", "button"]):
+                    with mock.patch("whisprflowctl.sample_many_parecord_levels", return_value=samples):
+                        code, _, _ = run_cli(["test", "sources", "--seconds", "1"])
 
         self.assertEqual(code, 0)
 
@@ -199,7 +209,7 @@ class CommandCliTests(unittest.TestCase):
             with mock.patch("whisprflowctl.apply_button_audio_settings", return_value=None):
                 with mock.patch("whisprflowctl.list_pulse_sources", return_value=["flat", "noise"]):
                     with mock.patch("whisprflowctl.sample_many_parecord_levels", return_value=samples):
-                        code = whisprflowctl.main(["test", "sources", "--seconds", "1"])
+                        code, _, _ = run_cli(["test", "sources", "--seconds", "1"])
 
         self.assertEqual(code, 1)
 
@@ -213,11 +223,10 @@ class CommandCliTests(unittest.TestCase):
             with mock.patch("whisprflowctl.apply_button_audio_settings", return_value=None):
                 with mock.patch("whisprflowctl.list_pulse_sources", return_value=["configured", "mic"]):
                     with mock.patch("whisprflowctl.sample_many_parecord_levels", return_value=samples):
-                        with mock.patch("sys.stdout", new_callable=StringIO) as stdout:
-                            code = whisprflowctl.main(["test", "sources", "--seconds", "1"])
+                        code, stdout, _ = run_cli(["test", "sources", "--seconds", "1"])
 
         self.assertEqual(code, 1)
-        self.assertIn("diagnosis\tconfigured button source stayed flat", stdout.getvalue())
+        self.assertIn("diagnosis\tconfigured button source stayed flat", stdout)
 
     def test_apply_button_audio_settings_matches_runtime_tuning(self):
         cfg = {"button_device": "alsa_input.example"}
@@ -256,10 +265,11 @@ class CommandCliTests(unittest.TestCase):
         samples = [[(100, 200), (4000, 9000), (4200, 9200)], [(40, 100), (900, 7000), (950, 7200)]]
 
         with mock.patch("whisprflowctl.load_config", return_value=cfg.copy()):
-            with mock.patch("whisprflowctl.sample_parecord_levels", side_effect=samples):
-                with mock.patch("whisprflowctl.save_config") as save:
-                    with mock.patch("whisprflowctl.run_command", return_value=0) as run:
-                        code = whisprflowctl.main(["calibrate", "--apply", "--seconds", "1"])
+            with mock.patch("whisprflowctl.apply_button_audio_settings", return_value=None):
+                with mock.patch("whisprflowctl.sample_parecord_levels", side_effect=samples):
+                    with mock.patch("whisprflowctl.save_config") as save:
+                        with mock.patch("whisprflowctl.run_command", return_value=0) as run:
+                            code, _, _ = run_cli(["calibrate", "--apply", "--seconds", "1"])
 
         self.assertEqual(code, 0)
         self.assertTrue(save.called)
@@ -281,7 +291,7 @@ class CommandCliTests(unittest.TestCase):
                         with mock.patch("sys.stdin.isatty", return_value=True):
                             with mock.patch("builtins.input", return_value="") as prompt:
                                 with mock.patch("whisprflowctl.apply_button_audio_settings", return_value=None):
-                                    code = whisprflowctl.main(["setup", "wizard", "--seconds", "1"])
+                                    code, _, _ = run_cli(["setup", "wizard", "--seconds", "1"])
 
         self.assertEqual(code, 0)
         self.assertEqual(prompt.call_count, 2)
@@ -301,7 +311,7 @@ class CommandCliTests(unittest.TestCase):
                     with mock.patch("whisprflowctl.sample_parecord_levels", side_effect=samples):
                         with mock.patch("builtins.input") as prompt:
                             with mock.patch("whisprflowctl.apply_button_audio_settings", return_value=None):
-                                code = whisprflowctl.main(["setup", "wizard", "--seconds", "1", "--no-prompt"])
+                                code, _, _ = run_cli(["setup", "wizard", "--seconds", "1", "--no-prompt"])
 
         self.assertEqual(code, 0)
         prompt.assert_not_called()
@@ -321,7 +331,7 @@ class CommandCliTests(unittest.TestCase):
                     with mock.patch("whisprflowctl.sample_parecord_levels", side_effect=samples):
                         with mock.patch("whisprflowctl.countdown") as countdown:
                             with mock.patch("whisprflowctl.apply_button_audio_settings", return_value=None):
-                                code = whisprflowctl.main([
+                                code, _, _ = run_cli([
                                     "setup",
                                     "wizard",
                                     "--seconds",

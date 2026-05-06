@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.3.7
+
+- Kept the example config and README default config aligned with runtime defaults.
+- Added a regression test to catch future config drift.
+- Made CLI unit tests quiet while preserving output assertions.
+
 ## v0.3.6
 
 - Removed `max_recording_sec` from defaults, example config, docs, and runtime.
