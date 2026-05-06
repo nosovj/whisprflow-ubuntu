@@ -4,6 +4,8 @@ Unofficial WhisprFlow-style dictation for Ubuntu/Linux. Hold the audio-jack butt
 
 Released under the Unlicense. Use it for anything.
 
+Release notes live in [CHANGELOG.md](CHANGELOG.md).
+
 ## Install
 
 Requires Python 3.10+, Git, curl, and Node.js/npm for OpenWhispr. The installer reads OpenWhispr's `package.json` and uses `nvm` when available to install the required Node major version. Current OpenWhispr requires Node.js 24+.
@@ -18,6 +20,12 @@ To install deps and immediately start the user service:
 
 ```bash
 ./install.sh --start
+```
+
+To install and run the guided hardware/setup wizard:
+
+```bash
+./install.sh --setup
 ```
 
 The installer:
@@ -35,6 +43,7 @@ The installer:
 - creates `~/.config/whisprflow/config.json`
 - installs `~/.config/systemd/user/whisprflow.service`
 - installs `~/.config/autostart/whisprflow.desktop`
+- optionally runs `whisprflowctl setup wizard` with `--setup`
 
 To skip OpenWhispr/model installation:
 
@@ -306,6 +315,7 @@ rm -f ~/.config/autostart/whisprflow.desktop
 - Audio button not triggering means `button_device`, `button_threshold`, or `button_peak_threshold` is wrong. Set `button_debug` to `true`, restart the service, and watch `journalctl --user -u whisprflow.service -f`.
 - Run `whisprflowctl test button` to check whether button levels are detectable and get threshold recommendations.
 - Run `whisprflowctl test sources --prep-seconds 3` if the configured button source stays flat. It watches all input sources and prints the source with the largest click spike.
+- If source testing prints `configured button source stayed flat`, the selected audio input did not receive the electrical button signal. Check the button cable, jack, TRS/TRRS adapter wiring, selected PulseAudio/PipeWire input port, and Ubuntu Sound Settings input meter before changing thresholds.
 - Run `whisprflowctl test mic` to check whether speech is too quiet, too loud, clipped, or indistinguishable from silence.
 - Run `whisprflowctl config validate` before restarting after manual edits.
 - `pynput` failures on Wayland can require running under X11/XWayland, depending on compositor security policy.

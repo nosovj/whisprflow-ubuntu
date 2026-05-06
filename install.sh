@@ -19,6 +19,7 @@ INSTALL_APT=1
 INSTALL_SERVICE=1
 INSTALL_OPENWHISPR=1
 START_SERVICE=0
+RUN_SETUP=0
 
 for arg in "$@"; do
   case "$arg" in
@@ -28,9 +29,10 @@ for arg in "$@"; do
     --openwhispr-root=*) OPENWHISPR_ROOT="${arg#*=}" ;;
     --model=*) MODEL_NAME="${arg#*=}" ;;
     --start) START_SERVICE=1 ;;
+    --setup) RUN_SETUP=1 ;;
     -h|--help)
       cat <<'EOF'
-Usage: ./install.sh [--no-apt] [--no-openwhispr] [--no-service] [--start]
+Usage: ./install.sh [--no-apt] [--no-openwhispr] [--no-service] [--start] [--setup]
 
 Installs Python deps, OpenWhispr server files, default STT model, config,
 and user service/autostart.
@@ -40,6 +42,7 @@ Options:
   --no-openwhispr          skip OpenWhispr clone/update and STT model download
   --no-service             skip systemd/autostart installation
   --start                  restart whisprflow.service after install
+  --setup                  run guided setup wizard after install
   --openwhispr-root=PATH   OpenWhispr checkout path (default: ~/openwhispr)
   OPENWHISPR_REF=REF       OpenWhispr git ref to install (default: dac4a1ba)
   --model=NAME             STT model: base or large-v3-turbo
@@ -192,6 +195,10 @@ if [[ "$INSTALL_SERVICE" == "1" ]]; then
   if [[ "$START_SERVICE" == "1" ]]; then
     systemctl --user restart whisprflow.service
   fi
+fi
+
+if [[ "$RUN_SETUP" == "1" ]]; then
+  "$ROOT/.venv/bin/python" "$ROOT/whisprflowctl.py" setup wizard
 fi
 
 missing=0
