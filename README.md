@@ -159,15 +159,17 @@ Default config:
 
 ```json
 {
-  "hotkey": "<f9>",
   "provider": "local_openwhispr",
   "trigger": "keyboard",
+  "hotkey": "<f9>",
   "button_device": "",
   "button_threshold": 2600,
   "button_peak_threshold": 7800,
   "button_peak_min_average": 2200,
   "button_press_chunks": 2,
   "button_debug": false,
+  "button_release_threshold": 2200,
+  "button_release_below_sec": 0.5,
   "button_chunk_size": 1600,
   "button_latency_msec": 20,
   "button_debounce_sec": 1.5,
@@ -178,9 +180,11 @@ Default config:
   "mic_channels": 2,
   "mic_channel": 0,
   "mic_preroll_enabled": false,
+  "mic_preroll_sec": 0.8,
   "mic_speech_threshold": 600,
   "mic_speech_peak_threshold": 1500,
   "mic_speech_peak_min_average": 150,
+  "mic_silence_stop_sec": 1.0,
   "mic_no_speech_stop_sec": 4.0,
   "mic_min_mean_abs": 220,
   "streaming_phrases": true,
@@ -189,6 +193,7 @@ Default config:
   "phrase_session_silence_stop_sec": 2.4,
   "phrase_min_duration_sec": 0.25,
   "mic_latency_msec": 20,
+  "button_stop_mode": "silence",
   "sample_rate": 16000,
   "channels": 1,
   "model": "whisper-1",
@@ -197,10 +202,10 @@ Default config:
   "min_duration_sec": 0.3,
   "paste_method": "auto",
   "play_beeps": true,
-  "release_tail_sec": 0.4,
-  "keep_failed_wav": null,
-  "status_file": null,
-  "hud_file": null,
+  "release_tail_sec": 0.2,
+  "keep_failed_wav": "/home/joe/whisprflow-ubuntu/last_failed.wav",
+  "status_file": "/home/joe/whisprflow-ubuntu/status.txt",
+  "hud_file": "/home/joe/whisprflow-ubuntu/hud.txt",
   "hud_preview_chars": 48
 }
 ```

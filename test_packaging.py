@@ -1,8 +1,40 @@
+import ast
+import json
 from pathlib import Path
 import unittest
 
 
 ROOT = Path(__file__).resolve().parent
+
+
+def default_config_from(path):
+    tree = ast.parse(path.read_text(encoding="utf-8"))
+    constants = {}
+    for node in tree.body:
+        if isinstance(node, (ast.Assign, ast.AnnAssign)):
+            targets = [node.target] if isinstance(node, ast.AnnAssign) else node.targets
+            for target in targets:
+                if (
+                    isinstance(target, ast.Name)
+                    and target.id
+                    in {"APP_DIR_NAME", "CONFIG_DIR_NAME", "LEGACY_CONFIG_DIR_NAME"}
+                ):
+                    constants[target.id] = ast.literal_eval(node.value)
+
+    env = {"Path": Path, **constants}
+    for node in tree.body:
+        if (
+            isinstance(node, ast.AnnAssign)
+            and isinstance(node.target, ast.Name)
+            and node.target.id == "DEFAULT_CONFIG"
+        ):
+            return eval(
+                compile(ast.Expression(node.value), str(path), "eval"),
+                {"__builtins__": {"str": str}},
+                env,
+            )
+
+    raise AssertionError(f"DEFAULT_CONFIG not found in {path}")
 
 
 class PackagingTests(unittest.TestCase):
@@ -49,6 +81,12 @@ class PackagingTests(unittest.TestCase):
             content = (ROOT / path).read_text(encoding="utf-8")
             self.assertNotIn("max_recording_sec", content)
             self.assertNotIn("max recording duration", content)
+
+    def test_example_config_matches_runtime_defaults(self):
+        example_config = json.loads((ROOT / "config.example.json").read_text(encoding="utf-8"))
+
+        self.assertEqual(example_config, default_config_from(ROOT / "whisprflow.py"))
+        self.assertEqual(example_config, default_config_from(ROOT / "whisprflowctl.py"))
 
     def test_ci_runs_unit_shell_and_secret_checks(self):
         workflow = (ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
