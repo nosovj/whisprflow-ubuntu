@@ -37,6 +37,13 @@ def default_config_from(path):
     raise AssertionError(f"DEFAULT_CONFIG not found in {path}")
 
 
+def normalize_config_for_example(config):
+    config = dict(config)
+    for key in ("keep_failed_wav", "status_file", "hud_file"):
+        config[key] = None
+    return config
+
+
 class PackagingTests(unittest.TestCase):
     def test_installer_can_install_openwhispr_and_model(self):
         install = (ROOT / "install.sh").read_text(encoding="utf-8")
@@ -83,10 +90,18 @@ class PackagingTests(unittest.TestCase):
             self.assertNotIn("max recording duration", content)
 
     def test_example_config_matches_runtime_defaults(self):
-        example_config = json.loads((ROOT / "config.example.json").read_text(encoding="utf-8"))
+        example_config = normalize_config_for_example(
+            json.loads((ROOT / "config.example.json").read_text(encoding="utf-8"))
+        )
 
-        self.assertEqual(example_config, default_config_from(ROOT / "whisprflow.py"))
-        self.assertEqual(example_config, default_config_from(ROOT / "whisprflowctl.py"))
+        self.assertEqual(
+            example_config,
+            normalize_config_for_example(default_config_from(ROOT / "whisprflow.py")),
+        )
+        self.assertEqual(
+            example_config,
+            normalize_config_for_example(default_config_from(ROOT / "whisprflowctl.py")),
+        )
 
     def test_ci_runs_unit_shell_and_secret_checks(self):
         workflow = (ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")

@@ -155,7 +155,7 @@ journalctl --user -u whisprflow.service -f
 
 ## Config
 
-Default config:
+Default config shape. Runtime fills path values under `~/whisprflow-ubuntu` when unset.
 
 ```json
 {
@@ -203,9 +203,9 @@ Default config:
   "paste_method": "auto",
   "play_beeps": true,
   "release_tail_sec": 0.2,
-  "keep_failed_wav": "/home/joe/whisprflow-ubuntu/last_failed.wav",
-  "status_file": "/home/joe/whisprflow-ubuntu/status.txt",
-  "hud_file": "/home/joe/whisprflow-ubuntu/hud.txt",
+  "keep_failed_wav": null,
+  "status_file": null,
+  "hud_file": null,
   "hud_preview_chars": 48
 }
 ```
