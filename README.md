@@ -199,6 +199,18 @@ Default config shape. Runtime fills path values under `~/whisprflow-ubuntu` when
   "model": "whisper-1",
   "local_url": "http://127.0.0.1:8180/inference",
   "language": null,
+  "custom_terms": [],
+  "dictionary_files": [
+    "~/.config/whisprflow/dictionary.txt"
+  ],
+  "context_roots": [],
+  "context_filenames": [
+    ".whisprflow-dictionary",
+    "WHISPRFLOW.md",
+    "AGENTS.md",
+    "CLAUDE.md"
+  ],
+  "prompt_max_chars": 900,
   "min_duration_sec": 0.3,
   "paste_method": "auto",
   "play_beeps": true,
@@ -221,6 +233,41 @@ The audio-jack button behaves like a pulse with a long electrical decay, not a c
 Conky reads `status_file` for generic state. The floating HUD reads `hud_file` and only shows the latest finalized phrase briefly after it is pasted.
 
 On X11, `auto` prefers `xdotool`, then clipboard. On Wayland, `auto` prefers `wtype`, then `ydotool`, then clipboard.
+
+### Dictionary Hints
+
+WhisprFlow can bias Whisper toward project-specific terms without sending full project docs. Add one term or phrase per line:
+
+```bash
+mkdir -p ~/.config/whisprflow
+printf '%s\n' 'Workspace ID' 'Example Project Name' > ~/.config/whisprflow/dictionary.txt
+```
+
+For repo-local terms, create `.whisprflow-dictionary` in the project:
+
+```text
+Workspace ID
+schema annotation
+Example Project Name
+```
+
+Or add an explicit dictionary section to `WHISPRFLOW.md`, `AGENTS.md`, or `CLAUDE.md`:
+
+```md
+## WhisprFlow Dictionary
+- Workspace ID
+- schema annotation
+- Example Project Name
+```
+
+Then point config at the project path:
+
+```bash
+whisprflowctl config set context_roots '["~/my-project"]'
+systemctl --user restart whisprflow.service
+```
+
+Only `custom_terms`, `dictionary_files`, `.whisprflow-dictionary`, and explicit `WhisprFlow Dictionary` sections are used. Full instruction files are not sent to transcription.
 
 ## Tested Setup
 

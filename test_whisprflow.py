@@ -12,6 +12,41 @@ import whisprflow
 
 
 class LocalOpenWhisprTests(unittest.TestCase):
+    def test_build_transcription_prompt_uses_custom_terms_and_caps_output(self):
+        prompt = whisprflow.build_transcription_prompt(
+            {
+                "custom_terms": ["Workspace ID", "Example Project Name", "Workspace ID"],
+                "dictionary_files": [],
+                "context_roots": [],
+                "context_filenames": [],
+                "prompt_max_chars": 24,
+            }
+        )
+
+        self.assertEqual(prompt, "Workspace ID")
+
+    def test_build_transcription_prompt_reads_marked_context_root_files_in_order(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = os.path.join(tmp, "repo")
+            nested = os.path.join(root, "pkg")
+            os.makedirs(nested)
+            with open(os.path.join(root, "AGENTS.md"), "w", encoding="utf-8") as f:
+                f.write("# Repo\n\n## WhisprFlow Dictionary\n- Workspace ID\n- Example Project Name\n\n## Other\n- ignored\n")
+            with open(os.path.join(nested, ".whisprflow-dictionary"), "w", encoding="utf-8") as f:
+                f.write("# comment\nschema annotation\nWorkspace ID\n")
+
+            prompt = whisprflow.build_transcription_prompt(
+                {
+                    "custom_terms": ["global term"],
+                    "dictionary_files": [],
+                    "context_roots": [nested],
+                    "context_filenames": [".whisprflow-dictionary", "AGENTS.md"],
+                    "prompt_max_chars": 900,
+                }
+            )
+
+        self.assertEqual(prompt, "global term, Workspace ID, Example Project Name, schema annotation")
+
     def test_local_whisper_parses_json_text_response(self):
         response = mock.Mock()
         response.text = json.dumps({"text": " hello\nworld "})
@@ -27,6 +62,11 @@ class LocalOpenWhisprTests(unittest.TestCase):
                     {
                         "local_url": "http://127.0.0.1:8180/inference",
                         "language": None,
+                        "custom_terms": ["Workspace ID", "Example Project Name"],
+                        "dictionary_files": [],
+                        "context_roots": [],
+                        "context_filenames": [],
+                        "prompt_max_chars": 900,
                     },
                 )
 
@@ -34,8 +74,36 @@ class LocalOpenWhisprTests(unittest.TestCase):
         args, kwargs = post.call_args
         self.assertEqual(args[0], "http://127.0.0.1:8180/inference")
         self.assertEqual(kwargs["data"]["response_format"], "json")
+        self.assertEqual(kwargs["data"]["prompt"], "Workspace ID, Example Project Name")
         self.assertNotIn("language", kwargs["data"])
         self.assertEqual(kwargs["timeout"], 300)
+
+    def test_openai_whisper_gets_same_transcription_prompt(self):
+        response = mock.Mock()
+        response.text = " Workspace ID Example Project Name "
+        response.raise_for_status.return_value = None
+
+        with tempfile.NamedTemporaryFile(suffix=".wav") as wav:
+            wav.write(b"RIFFfake")
+            wav.flush()
+            with mock.patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}, clear=False):
+                with mock.patch("whisprflow.requests.post", return_value=response) as post:
+                    text = whisprflow.transcribe_openai(
+                        wav.name,
+                        {
+                            "model": "whisper-1",
+                            "language": None,
+                            "custom_terms": ["Workspace ID", "Example Project Name"],
+                            "dictionary_files": [],
+                            "context_roots": [],
+                            "context_filenames": [],
+                            "prompt_max_chars": 900,
+                        },
+                    )
+
+        self.assertEqual(text, "Workspace ID Example Project Name")
+        _, kwargs = post.call_args
+        self.assertEqual(kwargs["data"]["prompt"], "Workspace ID, Example Project Name")
 
     def test_transcribe_dispatches_to_local_without_api_key(self):
         old_key = os.environ.pop("OPENAI_API_KEY", None)

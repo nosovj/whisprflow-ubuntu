@@ -39,6 +39,18 @@
   "model": "whisper-1",
   "local_url": "http://127.0.0.1:8180/inference",
   "language": null,
+  "custom_terms": [],
+  "dictionary_files": [
+    "~/.config/whisprflow/dictionary.txt"
+  ],
+  "context_roots": [],
+  "context_filenames": [
+    ".whisprflow-dictionary",
+    "WHISPRFLOW.md",
+    "AGENTS.md",
+    "CLAUDE.md"
+  ],
+  "prompt_max_chars": 900,
   "min_duration_sec": 0.3,
   "paste_method": "auto",
   "play_beeps": true,

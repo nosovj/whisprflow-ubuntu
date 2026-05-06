@@ -71,6 +71,11 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "model": "whisper-1",
     "local_url": "http://127.0.0.1:8180/inference",
     "language": None,
+    "custom_terms": [],
+    "dictionary_files": ["~/.config/whisprflow/dictionary.txt"],
+    "context_roots": [],
+    "context_filenames": [".whisprflow-dictionary", "WHISPRFLOW.md", "AGENTS.md", "CLAUDE.md"],
+    "prompt_max_chars": 900,
     "min_duration_sec": 0.3,
     "paste_method": "auto",
     "play_beeps": True,
@@ -145,6 +150,119 @@ def save_config(cfg: dict[str, Any]) -> None:
     path = config_path()
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(cfg, indent=2) + "\n", encoding="utf-8")
+
+
+def string_list(value: Any) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    return [item.strip() for item in value if isinstance(item, str) and item.strip()]
+
+
+def normalize_dictionary_term(line: str) -> str:
+    term = line.strip()
+    term = re.sub(r"^([-*+]|\d+[.)])\s+", "", term).strip()
+    term = term.strip("`").strip()
+    return " ".join(term.split())
+
+
+def parse_dictionary_lines(lines: list[str]) -> list[str]:
+    terms = []
+    for line in lines:
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#") or stripped.startswith("<!--"):
+            continue
+        term = normalize_dictionary_term(stripped)
+        if term:
+            terms.append(term)
+    return terms
+
+
+def extract_markdown_dictionary_terms(text: str) -> list[str]:
+    terms = []
+    marker_re = re.compile(
+        r"<!--\s*whisprflow-dictionary\s*-->(.*?)<!--\s*/whisprflow-dictionary\s*-->",
+        re.IGNORECASE | re.DOTALL,
+    )
+    for match in marker_re.finditer(text):
+        terms.extend(parse_dictionary_lines(match.group(1).splitlines()))
+
+    lines = text.splitlines()
+    collecting = False
+    collected: list[str] = []
+    for line in lines:
+        if re.match(r"^\s{0,3}#{1,6}\s+WhisprFlow Dictionary\s*$", line, re.IGNORECASE):
+            if collecting:
+                terms.extend(parse_dictionary_lines(collected))
+                collected = []
+            collecting = True
+            continue
+        if collecting and re.match(r"^\s{0,3}#{1,6}\s+", line):
+            terms.extend(parse_dictionary_lines(collected))
+            collected = []
+            collecting = False
+            continue
+        if collecting:
+            collected.append(line)
+    if collecting:
+        terms.extend(parse_dictionary_lines(collected))
+    return terms
+
+
+def read_dictionary_terms(path: Path) -> list[str]:
+    if not path.exists() or not path.is_file():
+        return []
+    try:
+        text = path.read_text(encoding="utf-8")
+    except Exception as exc:
+        print(f"dictionary warning: failed to read {path}: {exc}", file=sys.stderr, flush=True)
+        return []
+    if path.name.lower().endswith(".md"):
+        return extract_markdown_dictionary_terms(text)
+    return parse_dictionary_lines(text.splitlines())
+
+
+def context_dictionary_paths(root: str, filenames: list[str]) -> list[Path]:
+    path = Path(root).expanduser()
+    try:
+        path = path.resolve(strict=False)
+    except RuntimeError:
+        return []
+    if path.is_file():
+        path = path.parent
+    dirs = list(reversed([path, *path.parents]))
+    return [directory / filename for directory in dirs for filename in filenames]
+
+
+def build_transcription_prompt(cfg: dict[str, Any]) -> str:
+    max_chars = int(cfg.get("prompt_max_chars") or 0)
+    if max_chars <= 0:
+        return ""
+
+    terms = string_list(cfg.get("custom_terms"))
+    for item in string_list(cfg.get("dictionary_files")):
+        terms.extend(read_dictionary_terms(Path(item).expanduser()))
+
+    context_filenames = string_list(cfg.get("context_filenames"))
+    for root in string_list(cfg.get("context_roots")):
+        for path in context_dictionary_paths(root, context_filenames):
+            terms.extend(read_dictionary_terms(path))
+
+    deduped = []
+    seen = set()
+    for term in terms:
+        key = term.casefold()
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(term)
+
+    prompt = ""
+    for term in deduped:
+        candidate = term if not prompt else f"{prompt}, {term}"
+        if len(candidate) > max_chars:
+            continue
+        prompt = candidate
+    return prompt
 
 
 def key_to_spec(key: keyboard.Key | keyboard.KeyCode) -> str:
@@ -879,6 +997,9 @@ def transcribe_openai(path: str, cfg: dict[str, Any]) -> str:
     }
     if cfg.get("language"):
         data["language"] = str(cfg["language"])
+    prompt = build_transcription_prompt(cfg)
+    if prompt:
+        data["prompt"] = prompt
 
     with open(path, "rb") as f:
         files = {"file": ("audio.wav", f, "audio/wav")}
@@ -942,6 +1063,9 @@ def transcribe_local_openwhispr(path: str, cfg: dict[str, Any]) -> str:
     data: dict[str, str] = {"response_format": "json"}
     if cfg.get("language"):
         data["language"] = str(cfg["language"])
+    prompt = build_transcription_prompt(cfg)
+    if prompt:
+        data["prompt"] = prompt
 
     with open(path, "rb") as f:
         files = {"file": ("audio.wav", f, "audio/wav")}

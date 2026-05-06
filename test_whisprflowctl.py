@@ -60,6 +60,12 @@ class ConfigCliTests(unittest.TestCase):
         self.assertEqual(code, 2)
         self.assertFalse((Path(self.tmp.name) / "whisprflow" / "config.json").exists())
 
+    def test_config_set_rejects_non_string_dictionary_list(self):
+        code, _, stderr = run_cli(["config", "set", "custom_terms", '["Workspace ID", 123]'])
+
+        self.assertEqual(code, 2)
+        self.assertIn("custom_terms must be an array of strings", stderr)
+
     def test_config_validate_accepts_current_defaults(self):
         code, _, _ = run_cli(["config", "validate"])
 

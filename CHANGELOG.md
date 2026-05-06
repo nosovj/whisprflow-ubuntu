@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.3.8
+
+- Added transcription dictionary hints for local OpenWhispr and OpenAI Whisper.
+- Added global dictionary files, explicit project context roots, and marked dictionary sections in project docs.
+- Kept private/domain terms out of defaults and documentation examples.
+
 ## v0.3.7
 
 - Kept the example config and README default config aligned with runtime defaults.

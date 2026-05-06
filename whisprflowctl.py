@@ -75,6 +75,11 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "model": "whisper-1",
     "local_url": "http://127.0.0.1:8180/inference",
     "language": None,
+    "custom_terms": [],
+    "dictionary_files": ["~/.config/whisprflow/dictionary.txt"],
+    "context_roots": [],
+    "context_filenames": [".whisprflow-dictionary", "WHISPRFLOW.md", "AGENTS.md", "CLAUDE.md"],
+    "prompt_max_chars": 900,
     "min_duration_sec": 0.3,
     "paste_method": "auto",
     "play_beeps": True,
@@ -98,6 +103,10 @@ def config_value_error(key: str, value: Any) -> str | None:
         return f"paste_method must be one of {sorted(PASTE_METHODS)}"
     if key == "button_stop_mode" and value not in BUTTON_STOP_MODES:
         return f"button_stop_mode must be one of {sorted(BUTTON_STOP_MODES)}"
+    if key in {"custom_terms", "dictionary_files", "context_roots", "context_filenames"}:
+        if isinstance(value, list) and all(isinstance(item, str) for item in value):
+            return None
+        return f"{key} must be an array of strings"
     if default is None:
         if value is None or isinstance(value, str):
             return None
